@@ -67,10 +67,11 @@ The `target` declaration in _NLog.config_ can be expanded with additional proper
   <target name="seq" xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="">
     <property name="ThreadId" value="${threadid}" as="number" />
     <property name="MachineName" value="${machinename}" />
+    <property name="Source" value="${logger}" />
   </target>
 ```
 
-Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above.
+Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above. The value can be any supported [layout renderer](https://github.com/NLog/NLog/wiki/Layout-Renderers).
 
 ### Acknowledgements
 
