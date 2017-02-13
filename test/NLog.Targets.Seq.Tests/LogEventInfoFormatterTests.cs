@@ -21,7 +21,7 @@ namespace NLog.Targets.Seq.Tests
             act(logger);
 
             var formatted = new StringWriter();
-            LogEventInfoFormatter.ToCompactJson(target.Events, formatted, new List<SeqPropertyItem>());
+            LogEventInfoFormatter.ToCompactJson(target.Events.Single(), formatted, new List<SeqPropertyItem>());
 
             return Assertions.AssertValidJson(formatted.ToString());
         }
@@ -90,7 +90,7 @@ namespace NLog.Targets.Seq.Tests
             evt.Properties.Add("@Mistake", 42);
 
             var formatted = new StringWriter();
-            LogEventInfoFormatter.ToCompactJson(new[] { evt }, formatted, new List<SeqPropertyItem>());
+            LogEventInfoFormatter.ToCompactJson(evt, formatted, new List<SeqPropertyItem>());
             var jobject = Assertions.AssertValidJson(formatted.ToString());
 
             JToken val;
@@ -107,6 +107,20 @@ namespace NLog.Targets.Seq.Tests
             JToken val;
             Assert.True(jobject.TryGetValue("@t", out val));
             Assert.EndsWith("Z", val.ToObject<string>());
+        }
+
+        [Fact]
+        public void RenderingsAreRecordedWhenPositional()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("The number is {0:000}", 42));
+            Assert.Equal("042", (string)(evt["@r"][0]));
+        }
+
+        [Fact]
+        public void RenderingsAreRecordedWhenNamed()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("The number is {N:000}", 42));
+            Assert.Equal("042", (string)(evt["@r"][0]));
         }
     }
 }

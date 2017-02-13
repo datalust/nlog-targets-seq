@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using NLog.StructuredEvents;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace NLog.Targets.Seq
 {
@@ -49,58 +51,87 @@ namespace NLog.Targets.Seq
             };
         }
 
-        public static void ToCompactJson(IEnumerable<LogEventInfo> events, TextWriter output, IList<SeqPropertyItem> properties)
+        public static void ToCompactJson(IEnumerable<LogEventInfo> logEvents, TextWriter output, IList<SeqPropertyItem> properties)
         {
-            foreach (var loggingEvent in events)
+            foreach (var logEvent in logEvents)
             {
-                ToJson(loggingEvent, output, properties);
+                ToCompactJson(logEvent, output, properties);
                 output.Write(Environment.NewLine);
             }
         }
 
-        static void ToJson(LogEventInfo loggingEvent, TextWriter output, IList<SeqPropertyItem> properties)
+        public static void ToCompactJson(LogEventInfo logEvent, TextWriter output, IList<SeqPropertyItem> properties)
         {
-            if (loggingEvent == null) throw new ArgumentNullException(nameof(loggingEvent));
+            if (logEvent == null) throw new ArgumentNullException(nameof(logEvent));
             if (output == null) throw new ArgumentNullException(nameof(output));
             if (properties == null) throw new ArgumentNullException(nameof(properties));
 
+            // Without this call, logEventInfo.Properties behaves erratically when templates are used; stll trying
+            // to track down the cause (needs some debugging into NLog).
+            logEvent.FormattedMessage?.ToString();
+
             output.Write("{\"@t\":\"");
-            output.Write(loggingEvent.TimeStamp.ToUniversalTime().ToString("O"));
-            output.Write("\",\"@mt\":");
-            WriteString(loggingEvent.Message ?? "(No message)", output);
+            output.Write(logEvent.TimeStamp.ToUniversalTime().ToString("O"));
 
-            //var tokensWithFormat = loggingEvent.MessageTemplate.Tokens
-            //    .OfType<PropertyToken>()
-            //    .Where(pt => pt.Format != null);
+            string message = null;
+            Template template = null;
+            try
+            {
+                if (logEvent.Message != null)
+                {
+                    message = logEvent.Message;
+                    template = TemplateParser.Parse(logEvent.Message);
+                }
+            }
+            catch (TemplateParserException) { }
 
-            //// Better not to allocate an array in the 99.9% of cases where this is false
-            //// ReSharper disable once PossibleMultipleEnumeration
-            //if (tokensWithFormat.Any())
-            //{
-            //    output.Write(",\"@r\":[");
-            //    var delim = "";
-            //    foreach (var r in tokensWithFormat)
-            //    {
-            //        output.Write(delim);
-            //        delim = ",";
-            //        var space = new StringWriter();
-            //        r.Render(logEvent.Properties, space);
-            //        JsonValueFormatter.WriteQuotedJsonString(space.ToString(), output);
-            //    }
-            //    output.Write(']');
-            //}
+            if (message != null || (message == null && logEvent.FormattedMessage == null))
+            {
+                output.Write("\",\"@mt\":");
+                WriteString(message ?? "(No message)", output);
+            }
+            else
+            {
+                output.Write("\",\"@m\":");
+                WriteString(logEvent.FormattedMessage, output);
+            }
 
-            if (loggingEvent.Level.Name != InfoLevel)
+            var tokensWithFormat = template.Holes.Where(h => h.Format != null);
+
+            // Better not to allocate an array in the 99.9% of cases where this is false
+            // ReSharper disable once PossibleMultipleEnumeration
+            if (tokensWithFormat.Any())
+            {
+                output.Write(",\"@r\":[");
+                var delim = "";
+                foreach (var r in tokensWithFormat)
+                {
+                    output.Write(delim);
+                    delim = ",";
+                    var space = new StringWriter();
+                    var formatString = "{0:" + r.Format + "}";
+
+                    if (r.Name != null && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
+                        space.Write(formatString, logEvent.Properties[r.Name]);
+                    else if (logEvent.Parameters != null && logEvent.Parameters.Length >= r.Index)
+                        space.Write(formatString, logEvent.Parameters[r.Index]);
+
+                    WriteString(space.ToString(), output);
+                }
+                output.Write(']');
+            }
+
+            if (logEvent.Level.Name != InfoLevel)
             {
                 output.Write(",\"@l\":\"");
-                output.Write(loggingEvent.Level.Name);
+                output.Write(logEvent.Level.Name);
                 output.Write('\"');
             }
 
-            if (loggingEvent.Exception != null)
+            if (logEvent.Exception != null)
             {
                 output.Write(",\"@x\":");
-                WriteString(loggingEvent.Exception.ToString(), output);
+                WriteString(logEvent.Exception.ToString(), output);
             }
 
             var seenKeys = new HashSet<string>();
@@ -117,7 +148,7 @@ namespace NLog.Targets.Seq
                 WriteString(name, output);
                 output.Write(':');
 
-                var stringValue = property.Value.Render(loggingEvent);
+                var stringValue = property.Value.Render(logEvent);
                 if (property.As == "number")
                 {
                     decimal numberValue;
@@ -131,11 +162,11 @@ namespace NLog.Targets.Seq
                 WriteString(stringValue, output);
             }
 
-            if (loggingEvent.Message != null &&
-                loggingEvent.Message.Contains("{0") &&
-                loggingEvent.Parameters != null)
+            if (logEvent.Message != null &&
+                logEvent.Message.Contains("{0") &&
+                logEvent.Parameters != null)
             {
-                for (var i = 0; i < loggingEvent.Parameters.Length; ++i)
+                for (var i = 0; i < logEvent.Parameters.Length; ++i)
                 {
                     var name = i.ToString(CultureInfo.InvariantCulture);
                     if (seenKeys.Contains(name))
@@ -146,13 +177,13 @@ namespace NLog.Targets.Seq
                     output.Write(',');
                     WriteString(name, output);
                     output.Write(':');
-                    WriteLiteral(loggingEvent.Parameters[i], output);
+                    WriteLiteral(logEvent.Parameters[i], output);
                 }
             }
 
-            if (loggingEvent.Properties != null)
+            if (logEvent.Properties != null)
             {
-                foreach (var property in loggingEvent.Properties)
+                foreach (var property in logEvent.Properties)
                 {
                     var name = EscapeKey(property.Key.ToString());
                     if (seenKeys.Contains(name))
