@@ -57,17 +57,17 @@ When the events logged in this snippet are rendered to a file or console, they'l
 
 This makes filtering with expressions such as `Counter > 8` or `Name like 'nb%'` trivial: no regular expressions or log parsing are needed to recover the original values.
 
-And, of course, the fully-rendered message is there too, so you can still search for text like `"Hello, nblumhardt"` and find the events as you'd expect.
+The fully-rendered message is there too, so you can still search for text like `"Hello, nblumhardt"` and find the events you'd expect.
 
 ### Attaching additional properties
 
 The `target` declaration in _NLog.config_ can be expanded with additional properties:
 
 ```xml
-    <target name="seq" xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="">
-      <property name="ThreadId" value="${threadid}" as="number" />
-      <property name="MachineName" value="${machinename}" />
-    </target>
+  <target name="seq" xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="">
+    <property name="ThreadId" value="${threadid}" as="number" />
+    <property name="MachineName" value="${machinename}" />
+  </target>
 ```
 
 Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above.
