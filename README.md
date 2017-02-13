@@ -12,18 +12,7 @@ After installing NLog, install the _NLog.Targets.Seq_ package from NuGet:
 Install-Package NLog.Targets.Seq -Pre
 ```
 
-Then, add the target to your NLog configuration. You'll first need to add the _NLog.Targets.Seq_ assembly to the `extensions` element:
-
-```xml
-<?xml version="1.0" encoding="utf-8" ?>
-<nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd"
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <extensions>
-    <add assembly="NLog.Targets.Seq"/>
-  </extensions>
-```
-
-And then targets and rules entries:
+Then, add the target and rules entries to your NLog configuration:
 
 ```xml
   <targets>
