@@ -1,0 +1,45 @@
+﻿{
+  "version": "1.0.0-*",
+
+  "description": "An NLog target that writes structured log events to Seq",
+  "authors": [ "Datalust", "Contributors" ],
+
+  "packOptions": {
+    "tags": [ "seq", "nlog" ],
+    "projectUrl": "https://github.com/datalust/nlog-targets-seq",
+    "licenseUrl": "http://www.apache.org/licenses/LICENSE-2.0",
+    "iconUrl": "https://raw.githubusercontent.com/datalust/nlog-targets-seq/dev/asset/nlog-targets-seq.png"
+  },
+
+  "buildOptions": {
+    "keyFile": "../../asset/nlog-targets-seq.snk",
+    "warningsAsErrors": true,
+    "xmlDoc": true
+  },
+
+  "configurations": {
+    "Debug": {
+      "buildOptions": {
+        "define": [ "DEBUG", "TRACE", "CHECKED" ]
+      }
+    },
+    "Release": {
+      "buildOptions": {
+        "define": [ "RELEASE" ],
+        "optimize": true
+      }
+    }
+  },
+
+  "dependencies": {
+    "NLog": "4.5-alpha01"
+  },
+
+  "frameworks": {
+    "net45": {
+      "frameworkAssemblies": {
+        "System.ComponentModel.DataAnnotations": ""
+      }
+    }
+  }
+}
