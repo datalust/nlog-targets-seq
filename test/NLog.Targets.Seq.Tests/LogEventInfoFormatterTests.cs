@@ -33,6 +33,13 @@ namespace NLog.Targets.Seq.Tests
         }
 
         [Fact]
+        public void ANonInfoLevelEventIsValid()
+        {
+            dynamic evt = AssertValidJson(log => log.Warn("No properties"));
+            Assert.Equal("Warn", (string)evt["@l"]);
+        }
+
+        [Fact]
         public void AMinimalEventIsValidJson()
         {
             AssertValidJson(log => log.Info("One {Property}", 42));
