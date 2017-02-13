@@ -107,7 +107,7 @@ namespace NLog.Targets.Seq
 
             foreach (var property in properties)
             {
-                var name = SanitizeKey(property.Name);
+                var name = EscapeKey(property.Name);
                 if (seenKeys.Contains(name))
                     continue;
 
@@ -154,7 +154,7 @@ namespace NLog.Targets.Seq
             {
                 foreach (var property in loggingEvent.Properties)
                 {
-                    var name = SanitizeKey(property.Key.ToString());
+                    var name = EscapeKey(property.Key.ToString());
                     if (seenKeys.Contains(name))
                         continue;
 
@@ -168,7 +168,7 @@ namespace NLog.Targets.Seq
             }
         }
 
-        static string SanitizeKey(string key)
+        static string EscapeKey(string key)
         {
             var san = key;
             if (san.Length > 0 && san[0] == '@')
@@ -176,14 +176,6 @@ namespace NLog.Targets.Seq
                 // Escape first '@' by doubling
                 san = '@' + san;
             }
-
-            for (var i = 0; i < san.Length; ++i)
-            {
-                var ch = san[i];
-                if (ch != '_' && !char.IsLetterOrDigit(ch))
-                    return new string(san.Replace(":", "_").Where(c => c == '_' || char.IsLetterOrDigit(c)).ToArray());
-            }
-
             return san;
         }
         
