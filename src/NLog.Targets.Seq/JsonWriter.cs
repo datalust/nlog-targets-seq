@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using NLog.StructuredEvents.Parts;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 
 namespace NLog.Targets.Seq
@@ -30,24 +33,24 @@ namespace NLog.Targets.Seq
             {
                 { typeof(bool), (v, w) => WriteBoolean((bool)v, w) },
                 { typeof(char), (v, w) => WriteString(((char)v).ToString(CultureInfo.InvariantCulture), w) },
-                { typeof(byte), WriteToString },
-                { typeof(sbyte), WriteToString },
-                { typeof(short), WriteToString },
-                { typeof(ushort), WriteToString },
-                { typeof(int), WriteToString },
-                { typeof(uint), WriteToString },
-                { typeof(long), WriteToString },
-                { typeof(ulong), WriteToString },
-                { typeof(float), WriteToString },
-                { typeof(double), WriteToString },
-                { typeof(decimal), WriteToString },
+                { typeof(byte), WriteNumber },
+                { typeof(sbyte), WriteNumber },
+                { typeof(short), WriteNumber },
+                { typeof(ushort), WriteNumber },
+                { typeof(int), WriteNumber },
+                { typeof(uint), WriteNumber },
+                { typeof(long), WriteNumber },
+                { typeof(ulong), WriteNumber },
+                { typeof(float), (v, w) => WriteFloat((float)v, w) },
+                { typeof(double), (v, w) => WriteDouble((double)v, w) },
+                { typeof(decimal), WriteNumber },
                 { typeof(string), (v, w) => WriteString((string)v, w) },
                 { typeof(DateTime), (v, w) => WriteDateTime((DateTime)v, w) },
                 { typeof(DateTimeOffset), (v, w) => WriteOffset((DateTimeOffset)v, w) },
             };
         }
 
-        public static void WriteLiteral(object value, TextWriter output)
+        public static void WriteLiteral(object value, TextWriter output, CaptureType captureType = CaptureType.Normal, int depthRemaining = 5)
         {
             if (value == null)
             {
@@ -55,8 +58,11 @@ namespace NLog.Targets.Seq
                 return;
             }
 
-            // Attempt to convert the object (if a string) to its literal type (int/decimal/date)
-            value = GetValueAsLiteral(value);
+            if (captureType == CaptureType.Stringify)
+            {
+                WriteString(value.ToString(), output);
+                return;
+            }
 
             Action<object, TextWriter> writer;
             if (LiteralWriters.TryGetValue(value.GetType(), out writer))
@@ -65,12 +71,112 @@ namespace NLog.Targets.Seq
                 return;
             }
 
-            WriteString(value.ToString(), output);
+            if (depthRemaining == 1)
+            {
+                WriteString(value.ToString(), output);
+                return;
+            }
+
+            if (captureType == CaptureType.Normal)
+            {
+                if (value is IEnumerable)
+                    WriteLiteral(value, output, CaptureType.Serialize, 2);
+                else
+                    WriteString(value.ToString(), output);
+                return;
+            }
+
+            if (value is IEnumerable)
+            {
+                // Dictionary serialization missing here.
+                output.Write('[');
+                var arrayDelimiter = "";
+                foreach (var item in (IEnumerable)value)
+                {
+                    output.Write(arrayDelimiter);
+                    arrayDelimiter = ",";
+                    WriteLiteral(item, output, captureType, depthRemaining - 1);
+                }
+                output.Write(']');
+                return;
+            }
+
+            output.Write('{');
+            var propertyDelimiter = "";
+            foreach (var prop in value.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (prop.CanRead && !prop.IsSpecialName)
+                {
+                    output.Write(propertyDelimiter);
+                    propertyDelimiter = ",";
+                    WriteString(prop.Name, output);
+                    output.Write(':');
+
+                    try
+                    {
+                        var item = prop.GetValue(value);
+                        WriteLiteral(item, output, captureType, depthRemaining - 1);
+                    }
+                    catch (TargetInvocationException tie)
+                    {
+                        WriteString(tie.ToString(), output);
+                    }
+                }
+            }
+            output.Write('}');
         }
 
-        static void WriteToString(object number, TextWriter output)
+        public static void WriteString(string value, TextWriter output)
+        {
+            var content = Escape(value);
+            output.Write("\"");
+            output.Write(content);
+            output.Write("\"");
+        }
+
+        static void WriteNumber(object number, TextWriter output)
         {
             output.Write(number.ToString());
+        }
+
+        static void WriteDouble(double number, TextWriter output)
+        {
+            if (double.IsNaN(number))
+            {
+                WriteString("NaN", output);
+            }
+            else if (double.IsPositiveInfinity(number))
+            {
+                WriteString("Infinity", output);
+            }
+            else if (double.IsNegativeInfinity(number))
+            {
+                WriteString("-Infinity", output);
+            }
+            else
+            {
+                output.Write(number.ToString());
+            }
+        }
+
+        static void WriteFloat(float number, TextWriter output)
+        {
+            if (float.IsNaN(number))
+            {
+                WriteString("NaN", output);
+            }
+            else if (float.IsPositiveInfinity(number))
+            {
+                WriteString("Infinity", output);
+            }
+            else if (float.IsNegativeInfinity(number))
+            {
+                WriteString("-Infinity", output);
+            }
+            else
+            {
+                output.Write(number.ToString());
+            }
         }
 
         static void WriteBoolean(bool value, TextWriter output)
@@ -89,14 +195,6 @@ namespace NLog.Targets.Seq
         {
             output.Write("\"");
             output.Write(value.ToString("o"));
-            output.Write("\"");
-        }
-
-        public static void WriteString(string value, TextWriter output)
-        {
-            var content = Escape(value);
-            output.Write("\"");
-            output.Write(content);
             output.Write("\"");
         }
 
@@ -169,30 +267,6 @@ namespace NLog.Targets.Seq
             }
 
             return s;
-        }
-
-        /// <summary>
-        /// GetValueAsLiteral attempts to transform the (string) object into a literal type prior to json serialization.
-        /// </summary>
-        /// <param name="value">The value to be transformed/parsed.</param>
-        /// <returns>A translated representation of the literal object type instead of a string.</returns>
-        static object GetValueAsLiteral(object value)
-        {
-            var str = value as string;
-            if (str == null)
-                return value;
-
-            // All number literals are serialized as a decimal so ignore other number types.
-            decimal decimalBuffer;
-            if (decimal.TryParse(str, out decimalBuffer))
-                return decimalBuffer;
-
-            // Standardize on dates if/when possible.
-            DateTime dateBuffer;
-            if (DateTime.TryParse(str, out dateBuffer))
-                return dateBuffer;
-
-            return value;
         }
     }
 }

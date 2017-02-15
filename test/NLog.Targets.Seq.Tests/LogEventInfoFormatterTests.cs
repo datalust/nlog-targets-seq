@@ -46,6 +46,34 @@ namespace NLog.Targets.Seq.Tests
         }
 
         [Fact]
+        public void DefaultStructuredDataIsStringified()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("Some {StringData}", new StringData { Data = "A" }));
+            Assert.Equal("A", (string)evt.StringData);
+        }
+
+        [Fact]
+        public void SerializedStructuredDataIsCaptured()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("Some {@StringData}", new StringData { Data = "A" }));
+            Assert.Equal("A", (string)evt.StringData.Data);
+        }
+
+        [Fact]
+        public void EnumerableDataIsCapturedToDepth1ByDefault()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("Some {StringData}", new[] { new StringData { Data = "A" } }));
+            Assert.Equal("A", (string)evt.StringData[0]);
+        }
+
+        [Fact]
+        public void EnumerableDataIsCapturedToFullDepthWhenSerialized()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("Some {@StringData}", new[] { new StringData { Data = "A" } }));
+            Assert.Equal("A", (string)evt.StringData[0].Data);
+        }
+
+        [Fact]
         public void MultiplePropertiesAreDelimited()
         {
             AssertValidJson(log => log.Info("Property {First} and {Second}", "One", "Two"));
