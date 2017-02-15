@@ -88,17 +88,56 @@ namespace NLog.Targets.Seq
 
             if (value is IEnumerable)
             {
-                // Dictionary serialization missing here.
-                output.Write('[');
-                var arrayDelimiter = "";
-                foreach (var item in (IEnumerable)value)
+                Type keyType;
+                if (IsGenericDictionaryType(value.GetType(), out keyType))
                 {
-                    output.Write(arrayDelimiter);
-                    arrayDelimiter = ",";
-                    WriteLiteral(item, output, captureType, depthRemaining - 1);
+                    HashSet<string> seenKeys = null;
+
+                    output.Write('{');
+                    var dictionaryDelimiter = "";
+
+                    foreach (dynamic kvp in (IEnumerable)value)
+                    {
+                        var dk = (object)kvp.Key;
+                        var dv = (object)kvp.Value;
+
+                        string sk = null;
+                        if (keyType == typeof(string))
+                        {
+                            sk = (string)dk;
+                        }
+                        else
+                        {
+                            sk = dk.ToString();
+                            if (seenKeys != null && seenKeys.Contains(sk))
+                                continue;
+
+                            seenKeys = seenKeys ?? new HashSet<string>();
+                            seenKeys.Add(sk);
+                        }
+
+                        output.Write(dictionaryDelimiter);
+                        dictionaryDelimiter = ",";
+                        WriteString(sk, output);
+                        output.Write(':');
+                        WriteLiteral(dv, output, captureType, depthRemaining - 1);
+                    }
+                    output.Write('}');
+                    return;
                 }
-                output.Write(']');
-                return;
+                else
+                {
+                    output.Write('[');
+                    var arrayDelimiter = "";
+                    foreach (var item in (IEnumerable)value)
+                    {
+                        output.Write(arrayDelimiter);
+                        arrayDelimiter = ",";
+                        WriteLiteral(item, output, captureType, depthRemaining - 1);
+                    }
+                    output.Write(']');
+                    return;
+                }
             }
 
             output.Write('{');
@@ -267,6 +306,19 @@ namespace NLog.Targets.Seq
             }
 
             return s;
+        }
+
+        static bool IsGenericDictionaryType(Type type, out Type keyType)
+        {
+            if (type.IsConstructedGenericType &&
+                   type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+            {
+                keyType = type.GenericTypeArguments[0];
+                return true;
+            }
+
+            keyType = null;
+            return false;
         }
     }
 }
