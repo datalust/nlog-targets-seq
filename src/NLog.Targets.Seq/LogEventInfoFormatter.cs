@@ -50,7 +50,7 @@ namespace NLog.Targets.Seq
                 if (logEvent.Message != null)
                 {
                     message = logEvent.Message;
-                    template = logEvent.GetmessageTemplate();
+                    template = logEvent.GetMessageTemplate();
                 }
             }
             catch (TemplateParserException) { }
