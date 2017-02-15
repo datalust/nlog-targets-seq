@@ -66,16 +66,25 @@ namespace NLog.Targets.Seq
                 JsonWriter.WriteString(logEvent.FormattedMessage, output);
             }
 
+            Dictionary<string, CaptureType> captureTypes = null;
+
             if (template != null)
             {
                 List<Hole> tokensWithFormat = null;
                 for (var i = 0; i < template.Holes.Length; ++i)
                 {
                     var hole = template.Holes[i];
+
                     if (hole.Format != null)
                     {
                         tokensWithFormat = tokensWithFormat ?? new List<Hole>();
                         tokensWithFormat.Add(hole);
+                    }
+
+                    if (hole.Name != null && hole.Name != null && hole.CaptureType != CaptureType.Normal)
+                    {
+                        captureTypes = captureTypes ?? new Dictionary<string, CaptureType>();
+                        captureTypes.Add(hole.Name, hole.CaptureType);
                     }
                 }
 
@@ -174,7 +183,12 @@ namespace NLog.Targets.Seq
                     output.Write(',');
                     JsonWriter.WriteString(name, output);
                     output.Write(':');
-                    JsonWriter.WriteLiteral(property.Value, output);
+
+                    CaptureType captureType = CaptureType.Normal;
+                    if (captureTypes == null || !captureTypes.TryGetValue(name, out captureType))
+                        captureType = CaptureType.Normal;
+                    
+                    JsonWriter.WriteLiteral(property.Value, output, captureType);
                 }
             }
         }
