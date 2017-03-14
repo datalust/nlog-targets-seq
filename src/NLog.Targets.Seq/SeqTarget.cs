@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
@@ -51,6 +52,11 @@ namespace NLog.Targets.Seq
         public string ApiKey { get; set; }
 
         /// <summary>
+        /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
+        /// </summary>
+        public string Proxy { get; set; }
+
+        /// <summary>
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
@@ -87,6 +93,8 @@ namespace NLog.Targets.Seq
             uri += BulkUploadResource;
 
             var request = (HttpWebRequest) WebRequest.Create(uri);
+            if (!string.IsNullOrWhiteSpace(Proxy))
+                request.Proxy = new WebProxy(new Uri(Proxy), true);
             request.Method = "POST";
             request.ContentType = "application/vnd.serilog.clef; charset=utf-8";
             if (!string.IsNullOrWhiteSpace(ApiKey))
