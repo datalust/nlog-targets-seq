@@ -54,7 +54,7 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
-        public string Proxy { get; set; }
+        public string ProxyAddress { get; set; }
 
         /// <summary>
         /// A list of properties that will be attached to the events.
@@ -93,8 +93,8 @@ namespace NLog.Targets.Seq
             uri += BulkUploadResource;
 
             var request = (HttpWebRequest) WebRequest.Create(uri);
-            if (!string.IsNullOrWhiteSpace(Proxy))
-                request.Proxy = new WebProxy(new Uri(Proxy), true);
+            if (!string.IsNullOrWhiteSpace(ProxyAddress))
+                request.Proxy = new WebProxy(new Uri(ProxyAddress), true);
             request.Method = "POST";
             request.ContentType = "application/vnd.serilog.clef; charset=utf-8";
             if (!string.IsNullOrWhiteSpace(ApiKey))
