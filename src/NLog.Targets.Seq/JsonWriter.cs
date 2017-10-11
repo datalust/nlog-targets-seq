@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using NLog.StructuredEvents.Parts;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -86,7 +85,7 @@ namespace NLog.Targets.Seq
                 return;
             }
 
-            if (value is IEnumerable)
+            if (value is IEnumerable enumerable)
             {
                 Type keyType;
                 if (IsGenericDictionaryType(value.GetType(), out keyType))
@@ -96,12 +95,12 @@ namespace NLog.Targets.Seq
                     output.Write('{');
                     var dictionaryDelimiter = "";
 
-                    foreach (dynamic kvp in (IEnumerable)value)
+                    foreach (dynamic kvp in enumerable)
                     {
                         var dk = (object)kvp.Key;
                         var dv = (object)kvp.Value;
 
-                        string sk = null;
+                        string sk;
                         if (keyType == typeof(string))
                         {
                             sk = (string)dk;
@@ -125,19 +124,17 @@ namespace NLog.Targets.Seq
                     output.Write('}');
                     return;
                 }
-                else
+
+                output.Write('[');
+                var arrayDelimiter = "";
+                foreach (var item in enumerable)
                 {
-                    output.Write('[');
-                    var arrayDelimiter = "";
-                    foreach (var item in (IEnumerable)value)
-                    {
-                        output.Write(arrayDelimiter);
-                        arrayDelimiter = ",";
-                        WriteLiteral(item, output, captureType, depthRemaining - 1);
-                    }
-                    output.Write(']');
-                    return;
+                    output.Write(arrayDelimiter);
+                    arrayDelimiter = ",";
+                    WriteLiteral(item, output, captureType, depthRemaining - 1);
                 }
+                output.Write(']');
+                return;
             }
 
             output.Write('{');
@@ -194,7 +191,7 @@ namespace NLog.Targets.Seq
             }
             else
             {
-                output.Write(number.ToString());
+                output.Write(number.ToString(CultureInfo.InvariantCulture));
             }
         }
 
@@ -214,7 +211,7 @@ namespace NLog.Targets.Seq
             }
             else
             {
-                output.Write(number.ToString());
+                output.Write(number.ToString(CultureInfo.InvariantCulture));
             }
         }
 
