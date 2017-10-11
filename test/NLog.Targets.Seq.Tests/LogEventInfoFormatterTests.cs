@@ -137,7 +137,7 @@ namespace NLog.Targets.Seq.Tests
             Assert.EndsWith("Z", val.ToObject<string>());
         }
 
-        [Fact]
+        [Fact(Skip = "Waiting for guidance from NLog team")]
         public void RenderingsAreRecordedWhenPositional()
         {
             dynamic evt = AssertValidJson(log => log.Info("The number is {0:000}", 42));

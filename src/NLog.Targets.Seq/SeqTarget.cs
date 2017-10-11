@@ -66,7 +66,7 @@ namespace NLog.Targets.Seq
         /// Writes an array of logging events to Seq.
         /// </summary>
         /// <param name="logEvents">Logging events to be written.</param>
-        protected override void Write(AsyncLogEventInfo[] logEvents)
+        protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
             var events = logEvents.Select(e => e.LogEvent);
             PostBatch(events);
@@ -116,9 +116,7 @@ namespace NLog.Targets.Seq
                 {
                     var data = reader.ReadToEnd();
                     if ((int) response.StatusCode > 299)
-                        throw new WebException(string.Format("Received failed response {0} from Seq server: {1}",
-                            response.StatusCode,
-                            data));
+                        throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                 }
             }
         }

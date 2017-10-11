@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using NLog.StructuredEvents;
-using NLog.StructuredEvents.Parts;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using NLog.MessageTemplates;
 
 namespace NLog.Targets.Seq
 {
@@ -44,70 +43,66 @@ namespace NLog.Targets.Seq
             output.Write(logEvent.TimeStamp.ToUniversalTime().ToString("O"));
 
             string message = null;
-            Template template = null;
+            string template = null;
             try
             {
-                if (logEvent.Message != null)
-                {
-                    message = logEvent.Message;
-                    template = logEvent.GetMessageTemplate();
-                }
+                message = logEvent.FormattedMessage;
+                template = logEvent.Message;
             }
             catch (TemplateParserException) { }
 
-            if (message != null || (message == null && logEvent.FormattedMessage == null))
+            if (template != null)
             {
                 output.Write("\",\"@mt\":");
-                JsonWriter.WriteString(message ?? "(No message)", output);
+                JsonWriter.WriteString(template, output);
             }
             else
             {
                 output.Write("\",\"@m\":");
-                JsonWriter.WriteString(logEvent.FormattedMessage, output);
+                JsonWriter.WriteString(message, output);
             }
 
             Dictionary<string, CaptureType> captureTypes = null;
-
-            if (template != null)
+            List<MessageTemplateParameter> tokensWithFormat = null;
+            for (var i = 0; i < logEvent.MessageTemplateParameters.Count; ++i)
             {
-                List<Hole> tokensWithFormat = null;
-                for (var i = 0; i < template.Holes.Length; ++i)
+                var parameter = logEvent.MessageTemplateParameters[i];
+
+                if (parameter.Format != null)
                 {
-                    var hole = template.Holes[i];
-
-                    if (hole.Format != null)
+                    var captureType = Capturing.GetCaptureType(parameter.Format);
+                    if (captureType == CaptureType.Normal)
                     {
-                        tokensWithFormat = tokensWithFormat ?? new List<Hole>();
-                        tokensWithFormat.Add(hole);
+                        tokensWithFormat = tokensWithFormat ?? new List<MessageTemplateParameter>();
+                        tokensWithFormat.Add(parameter);
                     }
-
-                    if (hole.Name != null && hole.Name != null && hole.CaptureType != CaptureType.Normal)
+                    else
                     {
                         captureTypes = captureTypes ?? new Dictionary<string, CaptureType>();
-                        captureTypes.Add(hole.Name, hole.CaptureType);
+                        captureTypes.Add(parameter.Name, captureType);
                     }
                 }
+            }
 
-                if (tokensWithFormat != null)
+            if (tokensWithFormat != null)
+            {
+                output.Write(",\"@r\":[");
+                var delim = "";
+                foreach (var r in tokensWithFormat)
                 {
-                    output.Write(",\"@r\":[");
-                    var delim = "";
-                    foreach (var r in tokensWithFormat)
-                    {
-                        output.Write(delim);
-                        delim = ",";
-                        var space = new StringWriter();
-                        var formatString = "{0:" + r.Format + "}";
+                    output.Write(delim);
+                    delim = ",";
+                    var space = new StringWriter();
+                    var formatString = "{0:" + r.Format + "}";
 
-                        if (r.Name != null && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
-                            space.Write(formatString, logEvent.Properties[r.Name]);
-                        else if (logEvent.Parameters != null && logEvent.Parameters.Length >= r.Index)
-                            space.Write(formatString, logEvent.Parameters[r.Index]);
+                    if (!logEvent.MessageTemplateParameters.IsPositional && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
+                        space.Write(formatString, logEvent.Properties[r.Name]);
+                    else if (logEvent.Parameters != null && logEvent.Parameters.Length >= int.Parse(r.Name))
+                        space.Write(formatString, logEvent.Parameters[int.Parse(r.Name)]);
 
-                        JsonWriter.WriteString(space.ToString(), output);
-                    }
-                    output.Write(']');
+                    JsonWriter.WriteString(space.ToString(), output);
                 }
+                output.Write(']');
             }
 
             if (logEvent.Level.Name != InfoLevel)
@@ -152,7 +147,7 @@ namespace NLog.Targets.Seq
             }
 
             if (template != null &&
-                template.IsPositional &&
+                logEvent.MessageTemplateParameters.IsPositional &&
                 logEvent.Parameters != null)
             {
                 for (var i = 0; i < logEvent.Parameters.Length; ++i)
@@ -184,10 +179,10 @@ namespace NLog.Targets.Seq
                     JsonWriter.WriteString(name, output);
                     output.Write(':');
 
-                    CaptureType captureType = CaptureType.Normal;
+                    CaptureType captureType;
                     if (captureTypes == null || !captureTypes.TryGetValue(name, out captureType))
                         captureType = CaptureType.Normal;
-                    
+
                     JsonWriter.WriteLiteral(property.Value, output, captureType);
                 }
             }
