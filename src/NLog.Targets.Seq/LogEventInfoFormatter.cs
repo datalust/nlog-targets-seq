@@ -68,19 +68,15 @@ namespace NLog.Targets.Seq
             {
                 var parameter = logEvent.MessageTemplateParameters[i];
 
-                if (parameter.Format != null)
+                if (parameter.CaptureType == CaptureType.Normal && parameter.Format != null)
                 {
-                    var captureType = Capturing.GetCaptureType(parameter.Format);
-                    if (captureType == CaptureType.Normal)
-                    {
-                        tokensWithFormat = tokensWithFormat ?? new List<MessageTemplateParameter>();
-                        tokensWithFormat.Add(parameter);
-                    }
-                    else
-                    {
-                        captureTypes = captureTypes ?? new Dictionary<string, CaptureType>();
-                        captureTypes.Add(parameter.Name, captureType);
-                    }
+                    tokensWithFormat = tokensWithFormat ?? new List<MessageTemplateParameter>();
+                    tokensWithFormat.Add(parameter);
+                }
+                else
+                {
+                    captureTypes = captureTypes ?? new Dictionary<string, CaptureType>();
+                    captureTypes.Add(parameter.Name, parameter.CaptureType);
                 }
             }
 
@@ -97,8 +93,8 @@ namespace NLog.Targets.Seq
 
                     if (!logEvent.MessageTemplateParameters.IsPositional && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
                         space.Write(formatString, logEvent.Properties[r.Name]);
-                    else if (logEvent.Parameters != null && logEvent.Parameters.Length >= int.Parse(r.Name))
-                        space.Write(formatString, logEvent.Parameters[int.Parse(r.Name)]);
+                    else if (logEvent.Parameters != null && r.PositionalIndex.HasValue && logEvent.Parameters.Length >= r.PositionalIndex.Value)
+                        space.Write(formatString, logEvent.Parameters[r.PositionalIndex.Value]);
 
                     JsonWriter.WriteString(space.ToString(), output);
                 }

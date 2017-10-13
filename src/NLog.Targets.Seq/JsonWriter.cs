@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using NLog.MessageTemplates;
 
 namespace NLog.Targets.Seq
 {

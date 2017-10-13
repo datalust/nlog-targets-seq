@@ -49,7 +49,7 @@ namespace NLog.Targets.Seq.Tests
         public void DefaultStructuredDataIsStringified()
         {
             dynamic evt = AssertValidJson(log => log.Info("Some {StringData}", new StringData { Data = "A" }));
-            Assert.Equal("A", (string)evt.StringData);
+            Assert.Equal("SD:A", (string)evt.StringData);
         }
 
         [Fact]
@@ -63,7 +63,7 @@ namespace NLog.Targets.Seq.Tests
         public void EnumerableDataIsCapturedToDepth1ByDefault()
         {
             dynamic evt = AssertValidJson(log => log.Info("Some {StringData}", new[] { new StringData { Data = "A" } }));
-            Assert.Equal("A", (string)evt.StringData[0]);
+            Assert.Equal("SD:A", (string)evt.StringData[0]);
         }
 
         [Fact]
@@ -137,7 +137,7 @@ namespace NLog.Targets.Seq.Tests
             Assert.EndsWith("Z", val.ToObject<string>());
         }
 
-        [Fact(Skip = "Waiting for guidance from NLog team")]
+        [Fact]
         public void RenderingsAreRecordedWhenPositional()
         {
             dynamic evt = AssertValidJson(log => log.Info("The number is {0:000}", 42));
