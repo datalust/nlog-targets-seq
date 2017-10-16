@@ -62,18 +62,20 @@ namespace NLog.Targets.Seq
                 JsonWriter.WriteString(message, output);
             }
 
+            var mtp = logEvent.MessageTemplateParameters;
+
             Dictionary<string, CaptureType> captureTypes = null;
             List<MessageTemplateParameter> tokensWithFormat = null;
-            for (var i = 0; i < logEvent.MessageTemplateParameters.Count; ++i)
+            for (var i = 0; i < mtp.Count; ++i)
             {
-                var parameter = logEvent.MessageTemplateParameters[i];
+                var parameter = mtp[i];
 
                 if (parameter.CaptureType == CaptureType.Normal && parameter.Format != null)
                 {
                     tokensWithFormat = tokensWithFormat ?? new List<MessageTemplateParameter>();
                     tokensWithFormat.Add(parameter);
                 }
-                else
+                else if (parameter.CaptureType != CaptureType.Normal)
                 {
                     captureTypes = captureTypes ?? new Dictionary<string, CaptureType>();
                     captureTypes.Add(parameter.Name, parameter.CaptureType);
@@ -91,7 +93,7 @@ namespace NLog.Targets.Seq
                     var space = new StringWriter();
                     var formatString = "{0:" + r.Format + "}";
 
-                    if (!logEvent.MessageTemplateParameters.IsPositional && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
+                    if (!mtp.IsPositional && logEvent.Properties != null && logEvent.Properties.ContainsKey(r.Name))
                         space.Write(formatString, logEvent.Properties[r.Name]);
                     else if (logEvent.Parameters != null && r.PositionalIndex.HasValue && logEvent.Parameters.Length >= r.PositionalIndex.Value)
                         space.Write(formatString, logEvent.Parameters[r.PositionalIndex.Value]);
@@ -131,8 +133,7 @@ namespace NLog.Targets.Seq
                 var stringValue = property.Value.Render(logEvent);
                 if (property.As == "number")
                 {
-                    decimal numberValue;
-                    if (decimal.TryParse(stringValue, out numberValue))
+                    if (decimal.TryParse(stringValue, out var numberValue))
                     {
                         JsonWriter.WriteLiteral(numberValue, output);
                         continue;
