@@ -60,7 +60,7 @@ namespace NLog.Targets.Seq
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
-        public IList<SeqPropertyItem> Properties { get; private set; } 
+        public IList<SeqPropertyItem> Properties { get; } 
 
         /// <summary>
         /// Writes an array of logging events to Seq.
@@ -69,7 +69,11 @@ namespace NLog.Targets.Seq
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
             var events = logEvents.Select(e => e.LogEvent);
+
             PostBatch(events);
+
+            foreach (var evt in logEvents)
+                evt.Continuation(null);
         }
 
         /// <summary>
