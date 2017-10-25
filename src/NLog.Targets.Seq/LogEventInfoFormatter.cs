@@ -144,7 +144,7 @@ namespace NLog.Targets.Seq
             }
 
             if (template != null &&
-                logEvent.MessageTemplateParameters.IsPositional &&
+                mtp.IsPositional &&
                 logEvent.Parameters != null)
             {
                 for (var i = 0; i < logEvent.Parameters.Length; ++i)
