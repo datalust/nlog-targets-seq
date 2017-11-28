@@ -1,8 +1,8 @@
 # NLog.Targets.Seq [![NuGet Pre Release](https://img.shields.io/nuget/vpre/NLog.Targets.Seq.svg)](https://nuget.org/packages/NLog.Targets.Seq) [![Build status](https://ci.appveyor.com/api/projects/status/o22e6dq0mkftaggc?svg=true)](https://ci.appveyor.com/project/datalust/nlog-targets-seq)  [![Join the chat at https://gitter.im/datalust/seq](https://img.shields.io/gitter/room/datalust/seq.svg)](https://gitter.im/datalust/seq)
 
-An NLog target that writes events to [Seq](https://getseq.net). The target takes full advantage of the structured logging support in NLog 4.5 to provide hassle-free filtering, searching and analysis.
+An NLog target that writes events to [Seq](https://getseq.net). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
 
-**Projects using earlier NLog versions require the [_Seq.Client.NLog_ package](https://nuget.org/packages/seq.client.nlog) instead.**
+Projects using earlier NLog versions require the [_Seq.Client.NLog_ package](https://nuget.org/packages/seq.client.nlog) instead.
 
 ### Getting started
 
@@ -15,7 +15,7 @@ Install-Package NLog.Targets.Seq -Pre
 Then, add the target and rules entries to your NLog configuration:
 
 ```xml
-  <targets>
+  <targets async="true">
     <target name="seq" xsi:type="Seq" serverUrl="https://localhost:5341" apiKey="" />
   </targets>
   <rules>
