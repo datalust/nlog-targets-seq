@@ -5,26 +5,26 @@ namespace Example
 {
     class Program
     {
-        static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public static void Main()
         {
             const string server = "Seq", library = "NLog";
 
             // Structured logging: two named properties are captured using the message template:
-            logger.Info("Hello, {Server}, from {Library}", server, library);
+            Logger.Info("Hello, {Server}, from {Library}", server, library);
 
             // Text logging: the two properties are captured using positional arguments:
-            logger.Info("Goodbye, {0}, from {1}", server, library);
+            Logger.Info("Goodbye, {0}, from {1}", server, library);
 
             // Complex data can be captured and serialized into the event using the `@` directive:
-            logger.Info("Current user is {@User}", new { Name = Environment.UserName, Tags = new[]{ 1, 2, 3 }});
+            Logger.Info("Current user is {@User}, height {Height:0.00}", new { Name = Environment.UserName, Tags = new[]{ 1, 2, 3 }}, 123.4567);
 
             // Simple events are still accepted
-            logger.Info("Simple message");
+            Logger.Info("Simple message");
 
             // As are objects
-            logger.Info(new object());
+            Logger.Info(new object());
 
             Console.ReadKey();
         }

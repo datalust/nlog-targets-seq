@@ -20,6 +20,7 @@ using System.Linq;
 using System.Net;
 using NLog.Common;
 using NLog.Config;
+using NLog.Layouts;
 
 namespace NLog.Targets.Seq
 {
@@ -31,6 +32,16 @@ namespace NLog.Targets.Seq
     {
         const string BulkUploadResource = "api/events/raw";
         const string ApiKeyHeaderName = "X-Seq-ApiKey";
+
+        /// <summary>
+        /// The layout used to format `LogEvent`s as compact JSON.
+        /// </summary>
+        public JsonLayout TemplatedClefLayout { get; } = new CompactJsonLayout(true);
+
+        /// <summary>
+        /// The layout used to format `LogEvent`s as compact JSON.
+        /// </summary>
+        public JsonLayout TextClefLayout { get; } = new CompactJsonLayout(false);
 
         /// <summary>
         /// Initializes the target.
@@ -60,7 +71,23 @@ namespace NLog.Targets.Seq
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
-        public IList<SeqPropertyItem> Properties { get; } 
+        public IList<SeqPropertyItem> Properties { get; }
+
+        /// <summary>
+        /// Initializes the target. Can be used by inheriting classes
+        /// to initialize logging.
+        /// </summary>
+        protected override void InitializeTarget()
+        {
+            foreach (var prop in Properties)
+            {
+                var attr = new JsonAttribute(prop.Name, prop.Value, !prop.IsNumber);
+                TextClefLayout.Attributes.Add(attr);
+                TemplatedClefLayout.Attributes.Add(attr);
+            }
+
+            base.InitializeTarget();
+        }
 
         /// <summary>
         /// Writes an array of logging events to Seq.
@@ -107,7 +134,10 @@ namespace NLog.Targets.Seq
             using (var requestStream = request.GetRequestStream())
             using (var payload = new StreamWriter(requestStream))
             {
-                LogEventInfoFormatter.ToCompactJson(events, payload, Properties);
+                foreach (var evt in events)
+                {
+                    RenderCompactJsonLine(evt, payload);
+                }
             }
 
             using (var response = (HttpWebResponse) request.GetResponse())
@@ -123,6 +153,17 @@ namespace NLog.Targets.Seq
                         throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                 }
             }
+        }
+
+        internal void RenderCompactJsonLine(LogEventInfo evt, TextWriter output)
+        {
+            var json = RenderLogEvent(evt.HasProperties ? TemplatedClefLayout : TextClefLayout, evt);
+            output.WriteLine(json);
+        }
+
+        internal void TestInitialize()
+        {
+            InitializeTarget();
         }
     }
 }

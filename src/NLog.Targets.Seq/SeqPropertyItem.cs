@@ -50,5 +50,7 @@ namespace NLog.Targets.Seq
         /// </summary>
         [RequiredParameter]
         public string As { get; set; }
+
+        internal bool IsNumber => As == "number";
     }
 }
