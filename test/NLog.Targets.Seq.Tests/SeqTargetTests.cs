@@ -9,8 +9,21 @@ using Xunit;
 
 namespace NLog.Targets.Seq.Tests
 {
-    public class LogEventInfoFormatterTests
+    public class SeqTargetTests
     {
+        static void ToCompactJson(LogEventInfo evt, TextWriter output, IEnumerable<SeqPropertyItem> properties)
+        {
+            var target = new SeqTarget();
+            foreach (var prop in properties)
+            {
+                target.Properties.Add(prop);
+            }
+
+            target.TestInitialize();
+
+            target.RenderCompactJsonLine(evt, output);
+        }
+
         JObject AssertValidJson(Action<ILogger> act)
         {
             var logger = LogManager.GetCurrentClassLogger();
@@ -21,7 +34,8 @@ namespace NLog.Targets.Seq.Tests
             act(logger);
 
             var formatted = new StringWriter();
-            LogEventInfoFormatter.ToCompactJson(target.Events.Single(), formatted, new List<SeqPropertyItem>());
+            
+            ToCompactJson(target.Events.Single(), formatted, new List<SeqPropertyItem>());
 
             return Assertions.AssertValidJson(formatted.ToString());
         }
@@ -104,44 +118,13 @@ namespace NLog.Targets.Seq.Tests
         }
 
         [Fact]
-        public void AtPrefixedPropertyNamesAreEscaped()
+        public void TimestampIsUtcOrCarriesTimeZone()
         {
-            var logger = LogManager.GetCurrentClassLogger();
-            var target = new CollectingTarget();
-
-            SimpleConfigurator.ConfigureForTargetLogging(target, LogLevel.Trace);
-
-            logger.Info("Hello");
-            var evt = target.Events.Single();
-
-            // Not possible in message templates, but accepted this way
-            evt.Properties.Add("@Mistake", 42);
-
-            var formatted = new StringWriter();
-            LogEventInfoFormatter.ToCompactJson(evt, formatted, new List<SeqPropertyItem>());
-            var jobject = Assertions.AssertValidJson(formatted.ToString());
-
-            JToken val;
-            Assert.True(jobject.TryGetValue("@@Mistake", out val));
-            Assert.Equal(42, val.ToObject<int>());
-        }
-
-        [Fact]
-        public void TimestampIsUtc()
-        {
-            // Not possible in message templates, but accepted this way
             var jobject = AssertValidJson(log => log.Info("Hello"));
 
-            JToken val;
-            Assert.True(jobject.TryGetValue("@t", out val));
-            Assert.EndsWith("Z", val.ToObject<string>());
-        }
-
-        [Fact]
-        public void RenderingsAreRecordedWhenPositional()
-        {
-            dynamic evt = AssertValidJson(log => log.Info("The number is {0:000}", 42));
-            Assert.Equal("042", (string)(evt["@r"][0]));
+            Assert.True(jobject.TryGetValue("@t", out var val));
+            var str = val.ToObject<string>();
+            Assert.True(str.EndsWith("Z") || str[str.Length - 3] == ':');
         }
 
         [Fact]
