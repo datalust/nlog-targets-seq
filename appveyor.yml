@@ -11,12 +11,6 @@ test: off
 artifacts:
 - path: artifacts/NLog.Targets.Seq.*.nupkg
 deploy:
-- provider: NuGet
-  api_key:
-    secure: PyALDQp7P4HGAHww8oSEHAZ3ltQpua2eKKl+3DooOl+tlk5tMmMEW2YQQdhdwH7e
-  skip_symbols: true
-  on:
-    branch: /^(master|dev)$/
 - provider: GitHub
   auth_token:
     secure: hX+cZmW+9BCXy7vyH8myWsYdtQHyzzil9K5yvjJv7dK9XmyrGYYDj/DPzMqsXSjo
