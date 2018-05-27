@@ -27,23 +27,21 @@ namespace NLog.Targets.Seq
 
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
-            StringBuilder output;
-            RenderLogEvent(logEvent, target, out output);
-            if (output == null)
+            StringBuilder result = RenderLogEvent(logEvent, target);
+            if (result == null)
                 target.Append("null");
         }
 
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
-            StringBuilder output;
-            RenderLogEvent(logEvent, null, out output);
-            return output?.ToString() ?? "null";
+            StringBuilder result = RenderLogEvent(logEvent);
+            return result?.ToString() ?? "null";
         }
 
-        private void RenderLogEvent(LogEventInfo logEvent, StringBuilder preallocated, out StringBuilder output)
+        private StringBuilder RenderLogEvent(LogEventInfo logEvent, StringBuilder preallocated = null)
         {
             int orgLength = preallocated?.Length ?? 0;
-            output = null;
+            StringBuilder output = null;
 
             try
             {
@@ -74,6 +72,8 @@ namespace NLog.Targets.Seq
                         }
                     }
                 }
+
+                return output;
             }
             catch
             {
