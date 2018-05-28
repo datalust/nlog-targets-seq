@@ -76,9 +76,14 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// How far should the JSON serializer follow object references before backing off
         /// 
-        /// 0 = Minimal Reflection for only MessageTemplate, 1 = All properties has minimal reflection, Higher = Extensive JSON reflection
+        /// 0 = Minimal Reflection for only MessageTemplate, 1 = All properties has minimal
+        ///  reflection, Higher = Extensive JSON reflection
         /// </summary>
-        public int MaxRecursionLimit { get { return TemplatedClefLayout.MaxRecursionLimit; } set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; } }
+        public int MaxRecursionLimit
+        {
+            get => TemplatedClefLayout.MaxRecursionLimit;
+            set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; }
+        }
 
         WebProxy _webProxy;
         Uri _webRequestUri;
