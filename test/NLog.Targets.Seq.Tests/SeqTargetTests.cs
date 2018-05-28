@@ -11,9 +11,11 @@ namespace NLog.Targets.Seq.Tests
 {
     public class SeqTargetTests
     {
-        static void ToCompactJson(LogEventInfo evt, TextWriter output, IEnumerable<SeqPropertyItem> properties)
+        static void ToCompactJson(LogEventInfo evt, TextWriter output, IEnumerable<SeqPropertyItem> properties, int? maxRecursionLimit = null)
         {
             var target = new SeqTarget();
+            if (maxRecursionLimit.HasValue)
+                target.MaxRecursionLimit = maxRecursionLimit.Value;
             foreach (var prop in properties)
             {
                 target.Properties.Add(prop);
@@ -24,7 +26,7 @@ namespace NLog.Targets.Seq.Tests
             target.RenderCompactJsonLine(evt, output);
         }
 
-        JObject AssertValidJson(Action<ILogger> act)
+        JObject AssertValidJson(Action<ILogger> act, IEnumerable<SeqPropertyItem> properties = null, int? maxRecursionLimit = null)
         {
             var logger = LogManager.GetCurrentClassLogger();
             var target = new CollectingTarget();
@@ -35,7 +37,7 @@ namespace NLog.Targets.Seq.Tests
 
             var formatted = new StringWriter();
             
-            ToCompactJson(target.Events.Single(), formatted, new List<SeqPropertyItem>());
+            ToCompactJson(target.Events.Single(), formatted, properties?.ToList() ?? new List<SeqPropertyItem>(), maxRecursionLimit);
 
             return Assertions.AssertValidJson(formatted.ToString());
         }
@@ -57,6 +59,35 @@ namespace NLog.Targets.Seq.Tests
         public void AMinimalEventIsValidJson()
         {
             AssertValidJson(log => log.Info("One {Property}", 42));
+        }
+
+        [Fact]
+        public void ASimplePropertyEventIsValidJson()
+        {
+            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
+            logEvent.Properties["Answer"] = 42;
+            var evt = AssertValidJson(log => log.Info(logEvent));
+            Assert.Equal(42, evt["Answer"].Value<int>());
+        }
+
+        [Fact]
+        public void AToStringPropertyEventIsValidJson()
+        {
+            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
+            logEvent.Properties["Result"] = new DivideByZeroException();
+            var result = logEvent.Properties["Result"].ToString();
+            var evt = AssertValidJson(log => log.Info(logEvent));
+            Assert.Equal(result, evt["Result"].Value<string>());
+        }
+
+        [Fact]
+        public void AComplexPropertyEventIsValidJson()
+        {
+            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
+            logEvent.Properties["Result"] = new DivideByZeroException();
+            var result = logEvent.Properties["Result"].ToString();
+            var evt = AssertValidJson(log => log.Info(logEvent), maxRecursionLimit: 1);
+            Assert.Equal(3, evt["Result"].ToList().Count());
         }
 
         [Fact]
