@@ -55,17 +55,20 @@ namespace NLog.Targets.Seq
         /// The address of the Seq server to write to.
         /// </summary>
         [RequiredParameter]
-        public string ServerUrl { get; set; }
+        public string ServerUrl { get => (_serverUrl as SimpleLayout)?.Text; set => _serverUrl = value ?? string.Empty; }
+        private Layout _serverUrl;
 
         /// <summary>
         /// A Seq <i>API key</i> that authenticates the client to the Seq server.
         /// </summary>
-        public string ApiKey { get; set; }
+        public string ApiKey { get => (_apiKey as SimpleLayout)?.Text; set => _apiKey = value ?? string.Empty; }
+        private Layout _apiKey;
 
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
-        public string ProxyAddress { get; set; }
+        public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
+        private Layout _proxyAddress;
 
         /// <summary>
         /// A list of properties that will be attached to the events.
@@ -82,6 +85,7 @@ namespace NLog.Targets.Seq
 
         WebProxy _webProxy;
         Uri _webRequestUri;
+        string _headerApiKey;
 
         /// <summary>
         /// Initializes the target. Can be used by inheriting classes
@@ -98,13 +102,17 @@ namespace NLog.Targets.Seq
 
             if (!string.IsNullOrEmpty(ServerUrl))
             {
-                var uri = ServerUrl;
+                var uri = _serverUrl?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
                 if (!uri.EndsWith("/", StringComparison.InvariantCulture))
                     uri += "/";
                 uri += BulkUploadResource;
                 _webRequestUri = new Uri(uri);
             }
-            _webProxy = string.IsNullOrEmpty(ProxyAddress) ? null : new WebProxy(new Uri(ProxyAddress), true);
+
+            var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+            _webProxy = string.IsNullOrEmpty(proxyAddress) ? null : new WebProxy(new Uri(proxyAddress), true);
+
+            _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
 
             base.InitializeTarget();
         }
@@ -165,8 +173,8 @@ namespace NLog.Targets.Seq
                 request.Proxy = _webProxy;
             request.Method = "POST";
             request.ContentType = "application/vnd.serilog.clef; charset=utf-8";
-            if (!string.IsNullOrWhiteSpace(ApiKey))
-                request.Headers.Add(ApiKeyHeaderName, ApiKey);
+            if (!string.IsNullOrWhiteSpace(_headerApiKey))
+                request.Headers.Add(ApiKeyHeaderName, _headerApiKey);
 
             using (var requestStream = request.GetRequestStream())
             using (var payload = new StreamWriter(requestStream))
