@@ -9,19 +9,23 @@ Projects using earlier NLog versions require the [_Seq.Client.NLog_ package](htt
 After installing NLog, install the _NLog.Targets.Seq_ package from NuGet:
 
 ```
-Install-Package NLog.Targets.Seq -Pre
+Install-Package NLog.Targets.Seq
 ```
 
 Then, add the target and rules entries to your NLog configuration:
 
 ```xml
-  <targets async="true">
-    <target name="seq" xsi:type="Seq" serverUrl="https://localhost:5341" apiKey="" />
+  <targets>
+    <target name="seq" xsi:type="BufferingWrapper" bufferSize="1000" flushTimeout="2000">
+      <target xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="" />
+    </target>
   </targets>
   <rules>
     <logger name="*" minlevel="Info" writeTo="seq" />
   </rules>
 ```
+
+The `BufferingWrapper` ensures that writes to Seq do not block the application.
 
 Set the `serverUrl` value to the address of your Seq server, and provide an API key if you have one set up.
 
@@ -53,7 +57,7 @@ The fully-rendered message is there too, so you can still search for text like `
 The `target` declaration in _NLog.config_ can be expanded with additional properties:
 
 ```xml
-  <target name="seq" xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="">
+  <target xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="">
     <property name="ThreadId" value="${threadid}" as="number" />
     <property name="MachineName" value="${machinename}" />
     <property name="Source" value="${logger}" />
