@@ -15,14 +15,14 @@
     <PackageTags>seq;nlog</PackageTags>
     <PackageIconUrl>https://raw.githubusercontent.com/datalust/nlog-targets-seq/dev/asset/nlog-targets-seq.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/datalust/nlog-targets-seq</PackageProjectUrl>
-    <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
+    <PackageLicenseUrl>https://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/datalust/nlog-targets-seq.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NLog" Version="4.5.9" />
+    <PackageReference Include="NLog" Version="4.5.11" />
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
