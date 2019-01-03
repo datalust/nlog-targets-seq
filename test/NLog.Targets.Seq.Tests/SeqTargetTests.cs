@@ -164,5 +164,13 @@ namespace NLog.Targets.Seq.Tests
             dynamic evt = AssertValidJson(log => log.Info("The number is {N:000}", 42));
             Assert.Equal("042", (string)(evt["@r"][0]));
         }
+
+        [Fact]
+        public void IncorrectlyFormattedSerializedPropertiesAreCharitablyIncluded()
+        {
+            dynamic evt = AssertValidJson(log => log.Info("Some {@StringData:000}", new StringData { Data = "A" }));
+            Assert.Equal("A", (string)evt.StringData.Data);
+            Assert.Single((JArray)evt["@r"]);
+        }
     }
 }
