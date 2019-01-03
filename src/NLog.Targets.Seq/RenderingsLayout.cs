@@ -52,24 +52,34 @@ namespace NLog.Targets.Seq
                 {
                     var parameter = mtp[i];
 
-                    if (parameter.CaptureType == CaptureType.Normal && parameter.Format != null)
+                    if (parameter.Format != null)
                     {
-                        if (logEvent.Properties != null && logEvent.Properties.TryGetValue(parameter.Name, out var value))
+                        if (output == null)
                         {
-                            if (output == null)
-                            {
-                                output = preallocated ?? new StringBuilder();
-                                output.Append("[");
-                            }
-
-                            var formatString = string.Concat("{0:", parameter.Format, "}");
-                            var space = new StringWriter();
-                            space.Write(formatString, value);
-
-                            output.Append(nextDelimiter);
-                            nextDelimiter = ",";
-                            JsonConverter.SerializeObject(space.ToString(), output);
+                            output = preallocated ?? new StringBuilder();
+                            output.Append("[");
                         }
+
+                        var space = new StringWriter();
+
+                        if (logEvent.Properties != null &&
+                            logEvent.Properties.TryGetValue(parameter.Name, out var value))
+                        {
+                            switch (parameter.CaptureType)
+                            {
+                                case CaptureType.Normal:
+                                    var formatString = string.Concat("{0:", parameter.Format, "}");
+                                    space.Write(formatString, value);
+                                    break;
+                                default: // Serialize, Stringify, Unknown
+                                    space.Write(value);
+                                    break;
+                            }
+                        }
+
+                        output.Append(nextDelimiter);
+                        nextDelimiter = ",";
+                        JsonConverter.SerializeObject(space.ToString(), output);
                     }
                 }
 
