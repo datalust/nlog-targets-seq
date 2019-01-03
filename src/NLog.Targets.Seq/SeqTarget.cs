@@ -14,9 +14,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
-using System.Linq;
 using System.Net;
 using NLog.Common;
 using NLog.Config;
@@ -49,29 +47,50 @@ namespace NLog.Targets.Seq
         public SeqTarget()
         {
             Properties = new List<SeqPropertyItem>();
+            MaxRecursionLimit = 0;  // Default behavior for Serilog
+            OptimizeBufferReuse = true;
         }
 
         /// <summary>
         /// The address of the Seq server to write to.
         /// </summary>
-        [Required]
-        public string ServerUrl { get; set; }
+        [RequiredParameter]
+        public string ServerUrl { get => (_serverUrl as SimpleLayout)?.Text; set => _serverUrl = value ?? string.Empty; }
+        private Layout _serverUrl;
 
         /// <summary>
         /// A Seq <i>API key</i> that authenticates the client to the Seq server.
         /// </summary>
-        public string ApiKey { get; set; }
+        public string ApiKey { get => (_apiKey as SimpleLayout)?.Text; set => _apiKey = value ?? string.Empty; }
+        private Layout _apiKey;
 
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
-        public string ProxyAddress { get; set; }
+        public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
+        private Layout _proxyAddress;
 
         /// <summary>
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
         public IList<SeqPropertyItem> Properties { get; }
+
+        /// <summary>
+        /// How far should the JSON serializer follow object references before backing off
+        /// 
+        /// 0 = Minimal Reflection for only MessageTemplate, 1 = All properties has minimal
+        ///  reflection, Higher = Extensive JSON reflection
+        /// </summary>
+        public int MaxRecursionLimit
+        {
+            get => TemplatedClefLayout.MaxRecursionLimit;
+            set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; }
+        }
+
+        WebProxy _webProxy;
+        Uri _webRequestUri;
+        string _headerApiKey;
 
         /// <summary>
         /// Initializes the target. Can be used by inheriting classes
@@ -86,6 +105,20 @@ namespace NLog.Targets.Seq
                 TemplatedClefLayout.Attributes.Add(attr);
             }
 
+            if (!string.IsNullOrEmpty(ServerUrl))
+            {
+                var uri = _serverUrl?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+                if (!uri.EndsWith("/", StringComparison.InvariantCulture))
+                    uri += "/";
+                uri += BulkUploadResource;
+                _webRequestUri = new Uri(uri);
+            }
+
+            var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+            _webProxy = string.IsNullOrEmpty(proxyAddress) ? null : new WebProxy(new Uri(proxyAddress), true);
+
+            _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+
             base.InitializeTarget();
         }
 
@@ -95,12 +128,22 @@ namespace NLog.Targets.Seq
         /// <param name="logEvents">Logging events to be written.</param>
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
-            var events = logEvents.Select(e => e.LogEvent);
+            try
+            {
+                PostBatch(logEvents);
 
-            PostBatch(events);
+                for (int i = 0; i < logEvents.Count; ++i)
+                    logEvents[i].Continuation(null);
+            }
+            catch (Exception ex)
+            {
+                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvents", Name);
+                if (LogManager.ThrowExceptions)
+                    throw;
 
-            foreach (var evt in logEvents)
-                evt.Continuation(null);
+                for (int i = 0; i < logEvents.Count; ++i)
+                    logEvents[i].Continuation(ex);
+            }
         }
 
         /// <summary>
@@ -108,56 +151,67 @@ namespace NLog.Targets.Seq
         /// </summary>
         /// <param name="logEvent">Logging event to be written.
         /// </param>
-        protected override void Write(LogEventInfo logEvent)
+        protected override void Write(AsyncLogEventInfo logEvent)
         {
-            PostBatch(new[] { logEvent });
+            try
+            {
+                PostBatch(new[] { logEvent });
+                logEvent.Continuation(null);
+            }
+            catch (Exception ex)
+            {
+                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvent", Name);
+                if (LogManager.ThrowExceptions)
+                    throw;
+
+                logEvent.Continuation(ex);
+            }
         }
 
-        void PostBatch(IEnumerable<LogEventInfo> events)
+        void PostBatch(IList<AsyncLogEventInfo> logEvents)
         {
-            if (ServerUrl == null)
+            if (_webRequestUri == null)
                 return;
 
-            var uri = ServerUrl;
-            if (!uri.EndsWith("/"))
-                uri += "/";
-            uri += BulkUploadResource;
-
-            var request = (HttpWebRequest) WebRequest.Create(uri);
-            if (!string.IsNullOrWhiteSpace(ProxyAddress))
-                request.Proxy = new WebProxy(new Uri(ProxyAddress), true);
+            var request = (HttpWebRequest) WebRequest.Create(_webRequestUri);
+            if (_webProxy != null)
+                request.Proxy = _webProxy;
             request.Method = "POST";
             request.ContentType = "application/vnd.serilog.clef; charset=utf-8";
-            if (!string.IsNullOrWhiteSpace(ApiKey))
-                request.Headers.Add(ApiKeyHeaderName, ApiKey);
+            if (!string.IsNullOrWhiteSpace(_headerApiKey))
+                request.Headers.Add(ApiKeyHeaderName, _headerApiKey);
 
             using (var requestStream = request.GetRequestStream())
             using (var payload = new StreamWriter(requestStream))
             {
-                foreach (var evt in events)
+                for (int i = 0; i < logEvents.Count; ++i)
                 {
-                    RenderCompactJsonLine(evt, payload);
+                    var evt = logEvents[i];
+                    RenderCompactJsonLine(evt.LogEvent, payload);
                 }
             }
 
-            using (var response = (HttpWebResponse) request.GetResponse())
+            using (var response = (HttpWebResponse)request.GetResponse())
             {
-                var responseStream = response.GetResponseStream();
-                if (responseStream == null)
-                    throw new WebException("No response was received from the Seq server");
-
-                using (var reader = new StreamReader(responseStream))
+                if ((int)response.StatusCode > 299)
                 {
-                    var data = reader.ReadToEnd();
-                    if ((int) response.StatusCode > 299)
+                    var responseStream = response.GetResponseStream();
+                    if (responseStream == null)
+                        throw new WebException("No response was received from the Seq server");
+
+                    using (var reader = new StreamReader(responseStream))
+                    {
+                        var data = reader.ReadToEnd();
                         throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
+                    }
                 }
             }
         }
 
         internal void RenderCompactJsonLine(LogEventInfo evt, TextWriter output)
         {
-            var json = RenderLogEvent(evt.HasProperties ? TemplatedClefLayout : TextClefLayout, evt);
+            bool hasProperties = evt.HasProperties && evt.Properties.Count > 0;
+            var json = RenderLogEvent(hasProperties ? TemplatedClefLayout : TextClefLayout, evt);
             output.WriteLine(json);
         }
 
