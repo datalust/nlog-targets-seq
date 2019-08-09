@@ -20,6 +20,7 @@ using NLog.MessageTemplates;
 
 namespace NLog.Targets.Seq
 {
+    [ThreadSafe]
     class RenderingsLayout : Layout
     {
         IJsonConverter _jsonConverter;
