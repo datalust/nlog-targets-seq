@@ -42,6 +42,11 @@ namespace NLog.Targets.Seq
         public JsonLayout TextClefLayout { get; } = new CompactJsonLayout(false);
 
         /// <summary>
+        /// Maximum size allowed for JSON payload sent to Seq-Server. Discards logevents that are larger than limit.
+        /// </summary>
+        public int JsonPayloadMaxLength { get; set; }
+
+        /// <summary>
         /// Initializes the target.
         /// </summary>
         public SeqTarget()
@@ -49,6 +54,7 @@ namespace NLog.Targets.Seq
             Properties = new List<SeqPropertyItem>();
             MaxRecursionLimit = 0;  // Default behavior for Serilog
             OptimizeBufferReuse = true;
+            JsonPayloadMaxLength = 128 * 1024;
         }
 
         /// <summary>
@@ -131,13 +137,10 @@ namespace NLog.Targets.Seq
             try
             {
                 PostBatch(logEvents);
-
-                for (int i = 0; i < logEvents.Count; ++i)
-                    logEvents[i].Continuation(null);
             }
             catch (Exception ex)
             {
-                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvents", Name);
+                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvents. Uri={1}", Name, _webRequestUri);
                 if (LogManager.ThrowExceptions)
                     throw;
 
@@ -156,11 +159,10 @@ namespace NLog.Targets.Seq
             try
             {
                 PostBatch(new[] { logEvent });
-                logEvent.Continuation(null);
             }
             catch (Exception ex)
             {
-                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvent", Name);
+                InternalLogger.Error(ex, "Seq(Name={0}): Failed sending LogEvents. Uri={1}", Name, _webRequestUri);
                 if (LogManager.ThrowExceptions)
                     throw;
 
@@ -181,13 +183,33 @@ namespace NLog.Targets.Seq
             if (!string.IsNullOrWhiteSpace(_headerApiKey))
                 request.Headers.Add(ApiKeyHeaderName, _headerApiKey);
 
-            using (var requestStream = request.GetRequestStream())
-            using (var payload = new StreamWriter(requestStream))
+            List<AsyncLogEventInfo> extraBatch = null;
+            int totalPayload = 0;
+            using (var payload = new StreamWriter(request.GetRequestStream()))
             {
                 for (int i = 0; i < logEvents.Count; ++i)
                 {
-                    var evt = logEvents[i];
-                    RenderCompactJsonLine(evt.LogEvent, payload);
+                    var evt = logEvents[i].LogEvent;
+                    var json = RenderCompactJsonLine(evt);
+
+                    if (JsonPayloadMaxLength > 0)
+                    {
+                        if (json.Length > JsonPayloadMaxLength)
+                        {
+                            InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
+                            continue;
+                        }
+                        if (totalPayload + json.Length > JsonPayloadMaxLength)
+                        {
+                            extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
+                            for (; i < logEvents.Count; ++i)
+                                extraBatch.Add(logEvents[i]);
+                            break;
+                        }
+                    }
+
+                    totalPayload += json.Length;
+                    payload.WriteLine(json);
                 }
             }
 
@@ -206,13 +228,22 @@ namespace NLog.Targets.Seq
                     }
                 }
             }
+
+            var completedCount = logEvents.Count - (extraBatch?.Count ?? 0);
+            for (int i = 0; i < completedCount; ++i)
+                logEvents[i].Continuation(null);
+
+            if (extraBatch != null)
+            {
+                PostBatch(extraBatch);
+            }
         }
 
-        internal void RenderCompactJsonLine(LogEventInfo evt, TextWriter output)
+        internal string RenderCompactJsonLine(LogEventInfo evt)
         {
             bool hasProperties = evt.HasProperties && evt.Properties.Count > 0;
             var json = RenderLogEvent(hasProperties ? TemplatedClefLayout : TextClefLayout, evt);
-            output.WriteLine(json);
+            return json;
         }
 
         internal void TestInitialize()

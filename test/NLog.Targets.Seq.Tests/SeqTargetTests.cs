@@ -23,7 +23,8 @@ namespace NLog.Targets.Seq.Tests
 
             target.TestInitialize();
 
-            target.RenderCompactJsonLine(evt, output);
+            var json = target.RenderCompactJsonLine(evt);
+            output.WriteLine(json);
         }
 
         JObject AssertValidJson(Action<ILogger> act, IEnumerable<SeqPropertyItem> properties = null, int? maxRecursionLimit = null)
