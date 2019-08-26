@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26730.15
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29209.62
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{AC295EEA-D319-4146-97E0-B978DF6F2557}"
 EndProject
@@ -17,6 +17,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{2ED926D3-7
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "asset", "asset", "{69238E6E-26AB-494B-8CBD-65F8C1F0696A}"
 	ProjectSection(SolutionItems) = preProject
+		asset\nlog-events-in-seq.png = asset\nlog-events-in-seq.png
 		asset\nlog-targets-seq.png = asset\nlog-targets-seq.png
 		asset\nlog-targets-seq.snk = asset\nlog-targets-seq.snk
 		asset\nlog-targets-seq.svg = asset\nlog-targets-seq.svg

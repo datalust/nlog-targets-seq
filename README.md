@@ -2,21 +2,20 @@
 
 An NLog target that writes events to [Seq](https://getseq.net). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
 
-Projects using earlier NLog versions require the [_Seq.Client.NLog_ package](https://nuget.org/packages/seq.client.nlog) instead.
-
 ### Getting started
 
 After installing NLog, install the _NLog.Targets.Seq_ package from NuGet:
 
 ```
-Install-Package NLog.Targets.Seq
+dotnet add package NLog.Targets.Seq
 ```
 
 Then, add the target and rules entries to your NLog configuration:
 
 ```xml
   <targets>
-    <target name="seq" xsi:type="BufferingWrapper" bufferSize="1000" flushTimeout="2000">
+    <target name="seq" xsi:type="BufferingWrapper" bufferSize="1000"
+            flushTimeout="2000" slidingTimeout="false">
       <target xsi:type="Seq" serverUrl="http://localhost:5341" apiKey="" />
     </target>
   </targets>
