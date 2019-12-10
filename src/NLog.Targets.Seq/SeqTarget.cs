@@ -185,31 +185,34 @@ namespace NLog.Targets.Seq
 
             List<AsyncLogEventInfo> extraBatch = null;
             int totalPayload = 0;
-            using (var payload = new StreamWriter(request.GetRequestStream()))
+            using (var responseStream = request.GetRequestStream())
             {
-                for (int i = 0; i < logEvents.Count; ++i)
+                using (var payload = new StreamWriter(responseStream))
                 {
-                    var evt = logEvents[i].LogEvent;
-                    var json = RenderCompactJsonLine(evt);
-
-                    if (JsonPayloadMaxLength > 0)
+                    for (int i = 0; i < logEvents.Count; ++i)
                     {
-                        if (json.Length > JsonPayloadMaxLength)
-                        {
-                            InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
-                            continue;
-                        }
-                        if (totalPayload + json.Length > JsonPayloadMaxLength)
-                        {
-                            extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
-                            for (; i < logEvents.Count; ++i)
-                                extraBatch.Add(logEvents[i]);
-                            break;
-                        }
-                    }
+                        var evt = logEvents[i].LogEvent;
+                        var json = RenderCompactJsonLine(evt);
 
-                    totalPayload += json.Length;
-                    payload.WriteLine(json);
+                        if (JsonPayloadMaxLength > 0)
+                        {
+                            if (json.Length > JsonPayloadMaxLength)
+                            {
+                                InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
+                                continue;
+                            }
+                            if (totalPayload + json.Length > JsonPayloadMaxLength)
+                            {
+                                extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
+                                for (; i < logEvents.Count; ++i)
+                                    extraBatch.Add(logEvents[i]);
+                                break;
+                            }
+                        }
+
+                        totalPayload += json.Length;
+                        payload.WriteLine(json);
+                    }
                 }
             }
 
