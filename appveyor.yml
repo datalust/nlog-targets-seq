@@ -1,7 +1,6 @@
 version: '{build}'
 skip_tags: true
 image: Visual Studio 2019
-configuration: Release
 install:
   - ps: mkdir -Force ".\build\" | Out-Null 
   - ps: nuget update -Self
@@ -13,7 +12,7 @@ artifacts:
 deploy:
 - provider: NuGet
   api_key:
-    secure: aDvvick26/4UYAO2vAXGmwAOckdKw16bb2od4vmWzIe4PCncszOWaHt0BurMzfOo
+    secure: Hl9pr1a2/2Y9u9XwPO8FUCpGbO8taYFhYVnDRJbvl3rs5fcFaqd91+QbrcrtES/x
   skip_symbols: true
   on:
     branch: /^(master|dev)$/
