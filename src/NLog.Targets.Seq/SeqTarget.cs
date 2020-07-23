@@ -247,7 +247,7 @@ namespace NLog.Targets.Seq
                         using (var reader = new StreamReader(responseStream))
                         {
                             var data = reader.ReadToEnd();
-                            var serverRequestedLevel = data.ReadMinimumAcceptedLevel();
+                            var serverRequestedLevel = Levels.ReadMinimumAcceptedLevel(data);
                             if (serverRequestedLevel != MinimumLevel)
                             {
                                 InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);

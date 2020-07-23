@@ -1,3 +1,16 @@
+// Seq Target for NLog - Copyright 2014-2017 Datalust and contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 using System;
 using System.Collections.Generic;
@@ -64,7 +77,7 @@ namespace NLog.Targets.Seq
 
         /// <summary>Maps a level to an NLog equivalent level.</summary>
         /// <returns>NLog level; gauranteed not null</returns>
-        public static LogLevel ToNLogLevel(this string level)
+        public static LogLevel ToNLogLevel(string level)
         {
             return LevelsByName.TryGetValue(level, out var m) ? m.Item2 : LogLevel.Info;
         }
@@ -73,8 +86,8 @@ namespace NLog.Targets.Seq
         /// Looks for a minimum accpted level response header and (if found)
         /// maps it to an NLog level.
         /// </summary>
-        /// <returns>NLog level; guaranteed not null</returns>
-        public static LogLevel ReadMinimumAcceptedLevel(this string eventInputResult)
+        /// <returns>NLog level or null</returns>
+        public static LogLevel ReadMinimumAcceptedLevel(string eventInputResult)
         {
             if (eventInputResult == null) return null;
 
@@ -93,8 +106,7 @@ namespace NLog.Targets.Seq
                 return null;
 
             var value = eventInputResult.Substring(startValue, endValue - startValue);
-            var minimumAcceptedLevel = value.ToNLogLevel();
-
+            var minimumAcceptedLevel = ToNLogLevel(value);
             return minimumAcceptedLevel;
         }
     }
