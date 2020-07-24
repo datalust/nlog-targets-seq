@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Description>An NLog target that writes structured log events to Seq</Description>
     <Authors>Datalust;Contributors</Authors>
-    <VersionPrefix>1.2.1</VersionPrefix>
+    <VersionPrefix>1.3.0</VersionPrefix>
     <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -11,7 +11,7 @@
     <SignAssembly>true</SignAssembly>
     <PublicSign Condition=" '$(OS)' != 'Windows_NT' ">true</PublicSign>
     <PackageTags>seq;nlog</PackageTags>
-    <PackageIconUrl>https://raw.githubusercontent.com/datalust/nlog-targets-seq/dev/asset/nlog-targets-seq.png</PackageIconUrl>
+    <PackageIcon>nlog-targets-seq.png</PackageIcon>
     <PackageProjectUrl>https://github.com/datalust/nlog-targets-seq</PackageProjectUrl>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <RepositoryUrl>https://github.com/datalust/nlog-targets-seq.git</RepositoryUrl>
@@ -19,12 +19,19 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE" Pack="true" PackagePath="" />
+    <None Include="..\..\asset/nlog-targets-seq.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="NLog" Version="4.5.11" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">

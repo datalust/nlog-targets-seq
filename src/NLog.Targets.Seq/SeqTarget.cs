@@ -47,6 +47,13 @@ namespace NLog.Targets.Seq
         public int JsonPayloadMaxLength { get; set; }
 
         /// <summary>
+        /// The minimum log level that should be sent to the server.
+        /// This may be adjusted dynamically in response to server hints.
+        /// </summary>
+        public LogLevel MinimumLevel { get; set; } = LogLevel.Trace;
+
+
+        /// <summary>
         /// Initializes the target.
         /// </summary>
         public SeqTarget()
@@ -175,7 +182,7 @@ namespace NLog.Targets.Seq
             if (_webRequestUri == null)
                 return;
 
-            var request = (HttpWebRequest) WebRequest.Create(_webRequestUri);
+            var request = (HttpWebRequest)WebRequest.Create(_webRequestUri);
             if (_webProxy != null)
                 request.Proxy = _webProxy;
             request.Method = "POST";
@@ -190,6 +197,10 @@ namespace NLog.Targets.Seq
                 for (int i = 0; i < logEvents.Count; ++i)
                 {
                     var evt = logEvents[i].LogEvent;
+                    //[TPL] Don't process the event if it is below the minimum accepted level.
+                    if (evt.Level < MinimumLevel)
+                        continue;
+
                     var json = RenderCompactJsonLine(evt);
 
                     if (JsonPayloadMaxLength > 0)
@@ -227,7 +238,27 @@ namespace NLog.Targets.Seq
                         throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                     }
                 }
+                //[TPL] try to react to server's Minimum Accepted Level
+                if ((int)response.StatusCode == (int)HttpStatusCode.Created)
+                {
+                    var responseStream = response.GetResponseStream();
+                    if (responseStream != null)
+                    {
+                        using (var reader = new StreamReader(responseStream))
+                        {
+                            var data = reader.ReadToEnd();
+                            var serverRequestedLevel = Levels.ReadMinimumAcceptedLevel(data);
+                            if (serverRequestedLevel != MinimumLevel)
+                            {
+                                InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
+                                MinimumLevel = serverRequestedLevel;
+                            }
+                        }
+                    }
+                }
             }
+
+            //[TPL] try to set the minimum log level based on the server response
 
             var completedCount = logEvents.Count - (extraBatch?.Count ?? 0);
             for (int i = 0; i < completedCount; ++i)
