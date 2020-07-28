@@ -20,6 +20,8 @@ using NLog.Common;
 using NLog.Config;
 using NLog.Layouts;
 
+// ReSharper disable MemberCanBePrivate.Global
+
 namespace NLog.Targets.Seq
 {
     /// <summary>
@@ -28,8 +30,14 @@ namespace NLog.Targets.Seq
     [Target("Seq")]
     public sealed class SeqTarget : Target
     {
-        const string BulkUploadResource = "api/events/raw";
-        const string ApiKeyHeaderName = "X-Seq-ApiKey";
+        Layout _serverUrl;
+        Layout _apiKey;
+        Layout _proxyAddress;
+
+        WebProxy _webProxy;
+        Uri _webRequestUri;
+        string _headerApiKey;
+        LogLevel _minimumLevel = LogLevel.Trace;
 
         /// <summary>
         /// The layout used to format `LogEvent`s as compact JSON.
@@ -42,46 +50,25 @@ namespace NLog.Targets.Seq
         public JsonLayout TextClefLayout { get; } = new CompactJsonLayout(false);
 
         /// <summary>
-        /// Maximum size allowed for JSON payload sent to Seq-Server. Discards logevents that are larger than limit.
+        /// Maximum size allowed for JSON payload sent to Seq-Server. Discards log events that are larger than limit.
         /// </summary>
         public int JsonPayloadMaxLength { get; set; }
-
-        /// <summary>
-        /// The minimum log level that should be sent to the server.
-        /// This may be adjusted dynamically in response to server hints.
-        /// </summary>
-        public LogLevel MinimumLevel { get; set; } = LogLevel.Trace;
-
-
-        /// <summary>
-        /// Initializes the target.
-        /// </summary>
-        public SeqTarget()
-        {
-            Properties = new List<SeqPropertyItem>();
-            MaxRecursionLimit = 0;  // Default behavior for Serilog
-            OptimizeBufferReuse = true;
-            JsonPayloadMaxLength = 128 * 1024;
-        }
 
         /// <summary>
         /// The address of the Seq server to write to.
         /// </summary>
         [RequiredParameter]
         public string ServerUrl { get => (_serverUrl as SimpleLayout)?.Text; set => _serverUrl = value ?? string.Empty; }
-        private Layout _serverUrl;
 
         /// <summary>
         /// A Seq <i>API key</i> that authenticates the client to the Seq server.
         /// </summary>
         public string ApiKey { get => (_apiKey as SimpleLayout)?.Text; set => _apiKey = value ?? string.Empty; }
-        private Layout _apiKey;
-
+        
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
-        private Layout _proxyAddress;
 
         /// <summary>
         /// A list of properties that will be attached to the events.
@@ -100,10 +87,17 @@ namespace NLog.Targets.Seq
             get => TemplatedClefLayout.MaxRecursionLimit;
             set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; }
         }
-
-        WebProxy _webProxy;
-        Uri _webRequestUri;
-        string _headerApiKey;
+        
+        /// <summary>
+        /// Construct a <see cref="SeqTarget"/>.
+        /// </summary>
+        public SeqTarget()
+        {
+            Properties = new List<SeqPropertyItem>();
+            MaxRecursionLimit = 0;  // Default behavior for Serilog
+            OptimizeBufferReuse = true;
+            JsonPayloadMaxLength = 128 * 1024;
+        }
 
         /// <summary>
         /// Initializes the target. Can be used by inheriting classes
@@ -123,7 +117,7 @@ namespace NLog.Targets.Seq
                 var uri = _serverUrl?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
                 if (!uri.EndsWith("/", StringComparison.InvariantCulture))
                     uri += "/";
-                uri += BulkUploadResource;
+                uri += SeqApi.BulkUploadResource;
                 _webRequestUri = new Uri(uri);
             }
 
@@ -151,7 +145,7 @@ namespace NLog.Targets.Seq
                 if (LogManager.ThrowExceptions)
                     throw;
 
-                for (int i = 0; i < logEvents.Count; ++i)
+                for (var i = 0; i < logEvents.Count; ++i)
                     logEvents[i].Continuation(ex);
             }
         }
@@ -159,8 +153,7 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// Writes logging event to Seq.
         /// </summary>
-        /// <param name="logEvent">Logging event to be written.
-        /// </param>
+        /// <param name="logEvent">Logging event to be written.</param>
         protected override void Write(AsyncLogEventInfo logEvent)
         {
             try
@@ -186,19 +179,19 @@ namespace NLog.Targets.Seq
             if (_webProxy != null)
                 request.Proxy = _webProxy;
             request.Method = "POST";
-            request.ContentType = "application/vnd.serilog.clef; charset=utf-8";
+            request.ContentType = SeqApi.CompactLogEventFormatContentType;
             if (!string.IsNullOrWhiteSpace(_headerApiKey))
-                request.Headers.Add(ApiKeyHeaderName, _headerApiKey);
+                request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
 
             List<AsyncLogEventInfo> extraBatch = null;
-            int totalPayload = 0;
+            var totalPayload = 0;
             using (var payload = new StreamWriter(request.GetRequestStream()))
             {
-                for (int i = 0; i < logEvents.Count; ++i)
+                for (var i = 0; i < logEvents.Count; ++i)
                 {
                     var evt = logEvents[i].LogEvent;
-                    //[TPL] Don't process the event if it is below the minimum accepted level.
-                    if (evt.Level < MinimumLevel)
+
+                    if (evt.Level < _minimumLevel)
                         continue;
 
                     var json = RenderCompactJsonLine(evt);
@@ -223,6 +216,9 @@ namespace NLog.Targets.Seq
                     payload.WriteLine(json);
                 }
             }
+            
+            // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
+            // level changes sent by the server.
 
             using (var response = (HttpWebResponse)request.GetResponse())
             {
@@ -238,7 +234,7 @@ namespace NLog.Targets.Seq
                         throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                     }
                 }
-                //[TPL] try to react to server's Minimum Accepted Level
+
                 if ((int)response.StatusCode == (int)HttpStatusCode.Created)
                 {
                     var responseStream = response.GetResponseStream();
@@ -247,21 +243,19 @@ namespace NLog.Targets.Seq
                         using (var reader = new StreamReader(responseStream))
                         {
                             var data = reader.ReadToEnd();
-                            var serverRequestedLevel = Levels.ReadMinimumAcceptedLevel(data);
-                            if (serverRequestedLevel != MinimumLevel)
+                            var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
+                            if (serverRequestedLevel != _minimumLevel)
                             {
                                 InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
-                                MinimumLevel = serverRequestedLevel;
+                                _minimumLevel = serverRequestedLevel;
                             }
                         }
                     }
                 }
             }
 
-            //[TPL] try to set the minimum log level based on the server response
-
             var completedCount = logEvents.Count - (extraBatch?.Count ?? 0);
-            for (int i = 0; i < completedCount; ++i)
+            for (var i = 0; i < completedCount; ++i)
                 logEvents[i].Continuation(null);
 
             if (extraBatch != null)
@@ -272,7 +266,7 @@ namespace NLog.Targets.Seq
 
         internal string RenderCompactJsonLine(LogEventInfo evt)
         {
-            bool hasProperties = evt.HasProperties && evt.Properties.Count > 0;
+            var hasProperties = evt.HasProperties && evt.Properties.Count > 0;
             var json = RenderLogEvent(hasProperties ? TemplatedClefLayout : TextClefLayout, evt);
             return json;
         }

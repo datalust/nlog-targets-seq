@@ -28,20 +28,20 @@ namespace NLog.Targets.Seq
 
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
-            StringBuilder result = RenderLogEvent(logEvent, target);
+            var result = RenderLogEvent(logEvent, target);
             if (result == null)
                 target.Append("null");
         }
 
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
-            StringBuilder result = RenderLogEvent(logEvent);
+            var result = RenderLogEvent(logEvent);
             return result?.ToString() ?? "null";
         }
 
-        private StringBuilder RenderLogEvent(LogEventInfo logEvent, StringBuilder preallocated = null)
+        StringBuilder RenderLogEvent(LogEventInfo logEvent, StringBuilder preallocated = null)
         {
-            int orgLength = preallocated?.Length ?? 0;
+            var orgLength = preallocated?.Length ?? 0;
             StringBuilder output = null;
 
             try
@@ -49,39 +49,35 @@ namespace NLog.Targets.Seq
                 var nextDelimiter = "";
                 var mtp = logEvent.MessageTemplateParameters;
 
-                for (var i = 0; i < mtp.Count; ++i)
+                foreach (var parameter in mtp)
                 {
-                    var parameter = mtp[i];
-
-                    if (parameter.Format != null)
+                    if (parameter.Format == null) continue;
+                    
+                    if (output == null)
                     {
-                        if (output == null)
-                        {
-                            output = preallocated ?? new StringBuilder();
-                            output.Append("[");
-                        }
-
-                        var space = new StringWriter();
-
-                        if (logEvent.Properties != null &&
-                            logEvent.Properties.TryGetValue(parameter.Name, out var value))
-                        {
-                            switch (parameter.CaptureType)
-                            {
-                                case CaptureType.Normal:
-                                    var formatString = string.Concat("{0:", parameter.Format, "}");
-                                    space.Write(formatString, value);
-                                    break;
-                                default: // Serialize, Stringify, Unknown
-                                    space.Write(value);
-                                    break;
-                            }
-                        }
-
-                        output.Append(nextDelimiter);
-                        nextDelimiter = ",";
-                        JsonConverter.SerializeObject(space.ToString(), output);
+                        output = preallocated ?? new StringBuilder();
+                        output.Append("[");
                     }
+
+                    var space = new StringWriter();
+
+                    if (logEvent.Properties != null &&
+                        logEvent.Properties.TryGetValue(parameter.Name, out var value))
+                    {
+                        if (parameter.CaptureType == CaptureType.Normal)
+                        {
+                            var formatString = string.Concat("{0:", parameter.Format, "}");
+                            space.Write(formatString, value);
+                        }
+                        else
+                        {
+                            space.Write(value);
+                        }
+                    }
+
+                    output.Append(nextDelimiter);
+                    nextDelimiter = ",";
+                    JsonConverter.SerializeObject(space.ToString(), output);
                 }
 
                 return output;
@@ -95,8 +91,7 @@ namespace NLog.Targets.Seq
             }
             finally
             {
-                if (output != null)
-                    output.Append("]");
+                output?.Append("]");
             }
         }
 
