@@ -3,7 +3,7 @@ using NLog;
 
 namespace Example
 {
-    class Program
+    static class Program
     {
         static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -14,7 +14,7 @@ namespace Example
             // Structured logging: two named properties are captured using the message template:
             Logger.Info("Hello, {Server}, from {Library}", server, library);
 
-            // Text logging: the two properties are captured using positional arguments:
+            // Text logging: the two properties are formatted into the message using positional arguments:
             Logger.Info("Goodbye, {0}, from {1}", server, library);
 
             // Complex data can be captured and serialized into the event using the `@` directive:

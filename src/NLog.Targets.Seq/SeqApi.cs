@@ -20,8 +20,7 @@ namespace NLog.Targets.Seq
     {
         public const string BulkUploadResource = "api/events/raw";
         public const string ApiKeyHeaderName = "X-Seq-ApiKey";
-        public const string CompactLogEventFormatContentType = "application/vnd.serilog.clef; charset=utf-8";
-        public const string NoPayload = "";
+        public const string CompactLogEventFormatMediaType = "application/vnd.serilog.clef";
 
         // Why not use a JSON parser here? For a very small case, it's not
         // worth taking on the extra payload/dependency management issues that

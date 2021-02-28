@@ -14,8 +14,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
 using NLog.Common;
 using NLog.Config;
 using NLog.Layouts;
@@ -34,10 +36,12 @@ namespace NLog.Targets.Seq
         Layout _apiKey;
         Layout _proxyAddress;
 
-        WebProxy _webProxy;
         Uri _webRequestUri;
         string _headerApiKey;
+        HttpClient _httpClient;
         LogLevel _minimumLevel = LogLevel.Trace;
+
+        static readonly UTF8Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
         /// <summary>
         /// The layout used to format `LogEvent`s as compact JSON.
@@ -98,7 +102,7 @@ namespace NLog.Targets.Seq
             OptimizeBufferReuse = true;
             JsonPayloadMaxLength = 128 * 1024;
         }
-
+        
         /// <summary>
         /// Initializes the target. Can be used by inheriting classes
         /// to initialize logging.
@@ -119,12 +123,17 @@ namespace NLog.Targets.Seq
                     uri += "/";
                 uri += SeqApi.BulkUploadResource;
                 _webRequestUri = new Uri(uri);
+
+                _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+
+                HttpClientHandler handler = null;
+
+                var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+                if (!string.IsNullOrEmpty(proxyAddress))
+                    handler = new HttpClientHandler {Proxy = new WebProxy(new Uri(proxyAddress), true)};
+                
+                _httpClient = handler == null ? new HttpClient() : new HttpClient(handler);
             }
-
-            var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
-            _webProxy = string.IsNullOrEmpty(proxyAddress) ? null : new WebProxy(new Uri(proxyAddress), true);
-
-            _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
 
             base.InitializeTarget();
         }
@@ -137,7 +146,7 @@ namespace NLog.Targets.Seq
         {
             try
             {
-                PostBatch(logEvents);
+                PostBatch(logEvents).ConfigureAwait(false).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -158,7 +167,7 @@ namespace NLog.Targets.Seq
         {
             try
             {
-                PostBatch(new[] { logEvent });
+                PostBatch(new[] { logEvent }).ConfigureAwait(false).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -170,86 +179,69 @@ namespace NLog.Targets.Seq
             }
         }
 
-        void PostBatch(IList<AsyncLogEventInfo> logEvents)
+        async Task PostBatch(IList<AsyncLogEventInfo> logEvents)
         {
             if (_webRequestUri == null)
                 return;
 
-            var request = (HttpWebRequest)WebRequest.Create(_webRequestUri);
-            if (_webProxy != null)
-                request.Proxy = _webProxy;
-            request.Method = "POST";
-            request.ContentType = SeqApi.CompactLogEventFormatContentType;
+            var request = new HttpRequestMessage(HttpMethod.Post, _webRequestUri);
             if (!string.IsNullOrWhiteSpace(_headerApiKey))
                 request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
-
+            
             List<AsyncLogEventInfo> extraBatch = null;
             var totalPayload = 0;
-            using (var payload = new StreamWriter(request.GetRequestStream()))
+            var payload = new StringBuilder();
+
+            for (var i = 0; i < logEvents.Count; ++i)
             {
-                for (var i = 0; i < logEvents.Count; ++i)
+                var evt = logEvents[i].LogEvent;
+
+                if (evt.Level < _minimumLevel)
+                    continue;
+
+                var json = RenderCompactJsonLine(evt);
+
+                if (JsonPayloadMaxLength > 0)
                 {
-                    var evt = logEvents[i].LogEvent;
-
-                    if (evt.Level < _minimumLevel)
-                        continue;
-
-                    var json = RenderCompactJsonLine(evt);
-
-                    if (JsonPayloadMaxLength > 0)
+                    if (json.Length > JsonPayloadMaxLength)
                     {
-                        if (json.Length > JsonPayloadMaxLength)
-                        {
-                            InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
-                            continue;
-                        }
-                        if (totalPayload + json.Length > JsonPayloadMaxLength)
-                        {
-                            extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
-                            for (; i < logEvents.Count; ++i)
-                                extraBatch.Add(logEvents[i]);
-                            break;
-                        }
+                        InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
+                        continue;
                     }
-
-                    totalPayload += json.Length;
-                    payload.WriteLine(json);
+                    if (totalPayload + json.Length > JsonPayloadMaxLength)
+                    {
+                        extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
+                        for (; i < logEvents.Count; ++i)
+                            extraBatch.Add(logEvents[i]);
+                        break;
+                    }
                 }
+
+                totalPayload += json.Length;
+                payload.AppendLine(json);
             }
+
+            request.Content = new StringContent(payload.ToString(), Utf8, SeqApi.CompactLogEventFormatMediaType);
             
             // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
             // level changes sent by the server.
 
-            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var response = await _httpClient.SendAsync(request))
             {
                 if ((int)response.StatusCode > 299)
                 {
-                    var responseStream = response.GetResponseStream();
-                    if (responseStream == null)
-                        throw new WebException("No response was received from the Seq server");
-
-                    using (var reader = new StreamReader(responseStream))
-                    {
-                        var data = reader.ReadToEnd();
-                        throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
-                    }
+                    var data = await response.Content.ReadAsStringAsync();
+                    throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                 }
 
                 if ((int)response.StatusCode == (int)HttpStatusCode.Created)
                 {
-                    var responseStream = response.GetResponseStream();
-                    if (responseStream != null)
+                    var data = await response.Content.ReadAsStringAsync();
+                    var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
+                    if (serverRequestedLevel != _minimumLevel)
                     {
-                        using (var reader = new StreamReader(responseStream))
-                        {
-                            var data = reader.ReadToEnd();
-                            var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
-                            if (serverRequestedLevel != _minimumLevel)
-                            {
-                                InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
-                                _minimumLevel = serverRequestedLevel;
-                            }
-                        }
+                        InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
+                        _minimumLevel = serverRequestedLevel;
                     }
                 }
             }
@@ -260,7 +252,7 @@ namespace NLog.Targets.Seq
 
             if (extraBatch != null)
             {
-                PostBatch(extraBatch);
+                await PostBatch(extraBatch).ConfigureAwait(false);
             }
         }
 
@@ -274,6 +266,14 @@ namespace NLog.Targets.Seq
         internal void TestInitialize()
         {
             InitializeTarget();
+        }
+
+        /// <inheritdoc />
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _httpClient?.Dispose();
+            base.Dispose(disposing);
         }
     }
 }
