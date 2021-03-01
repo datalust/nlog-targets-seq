@@ -63,32 +63,31 @@ namespace NLog.Targets.Seq.Tests
         }
 
         [Fact]
-        public void ASimplePropertyEventIsValidJson()
+        public void SimpleEventPropertiesAreRenderedIntoJson()
         {
-            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
+            var logEvent = new LogEventInfo { Message = "Hello " };
             logEvent.Properties["Answer"] = 42;
             var evt = AssertValidJson(log => log.Info(logEvent));
             Assert.Equal(42, evt["Answer"].Value<int>());
         }
 
         [Fact]
-        public void AToStringPropertyEventIsValidJson()
+        public void DefaultRecursionLimitStringifiesComplexProperties()
         {
-            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
-            logEvent.Properties["Result"] = new DivideByZeroException();
+            var logEvent = new LogEventInfo { Message = "Hello " };
+            logEvent.Properties["Result"] = new { A = 1, B = 2, C = 3 };
             var result = logEvent.Properties["Result"].ToString();
             var evt = AssertValidJson(log => log.Info(logEvent));
             Assert.Equal(result, evt["Result"].Value<string>());
         }
 
         [Fact]
-        public void AComplexPropertyEventIsValidJson()
+        public void DeeperRecursionLimitSerializesComplexProperties()
         {
-            LogEventInfo logEvent = new LogEventInfo() { Message = "Hello " };
-            logEvent.Properties["Result"] = new DivideByZeroException();
-            var result = logEvent.Properties["Result"].ToString();
+            var logEvent = new LogEventInfo { Message = "Hello " };
+            logEvent.Properties["Result"] = new { A = 1, B = 2, C = 3 };
             var evt = AssertValidJson(log => log.Info(logEvent), maxRecursionLimit: 1);
-            Assert.Equal(3, evt["Result"].ToList().Count());
+            Assert.Equal(3, evt["Result"].ToList().Count);
         }
 
         [Fact]
@@ -152,9 +151,9 @@ namespace NLog.Targets.Seq.Tests
         [Fact]
         public void TimestampIsUtcOrCarriesTimeZone()
         {
-            var jobject = AssertValidJson(log => log.Info("Hello"));
+            var jObject = AssertValidJson(log => log.Info("Hello"));
 
-            Assert.True(jobject.TryGetValue("@t", out var val));
+            Assert.True(jObject.TryGetValue("@t", out var val));
             var str = val.ToObject<string>();
             Assert.True(str.EndsWith("Z") || str[str.Length - 3] == ':');
         }
