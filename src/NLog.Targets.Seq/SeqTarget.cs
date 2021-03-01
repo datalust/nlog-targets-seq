@@ -146,7 +146,7 @@ namespace NLog.Targets.Seq
         {
             try
             {
-                PostBatch(logEvents).ConfigureAwait(false).GetAwaiter().GetResult();
+                PostBatch(logEvents).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -167,7 +167,7 @@ namespace NLog.Targets.Seq
         {
             try
             {
-                PostBatch(new[] { logEvent }).ConfigureAwait(false).GetAwaiter().GetResult();
+                PostBatch(new[] { logEvent }).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -226,17 +226,17 @@ namespace NLog.Targets.Seq
             // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
             // level changes sent by the server.
 
-            using (var response = await _httpClient.SendAsync(request))
+            using (var response = await _httpClient.SendAsync(request).ConfigureAwait(false))
             {
                 if ((int)response.StatusCode > 299)
                 {
-                    var data = await response.Content.ReadAsStringAsync();
+                    var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
                 }
 
                 if ((int)response.StatusCode == (int)HttpStatusCode.Created)
                 {
-                    var data = await response.Content.ReadAsStringAsync();
+                    var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
                     if (serverRequestedLevel != _minimumLevel)
                     {
