@@ -22,4 +22,4 @@ deploy:
   artifact: /NLog.Targets.Seq.*\.nupkg/
   tag: v$(appveyor_build_version)
   on:
-    branch: master
+    branch: main
