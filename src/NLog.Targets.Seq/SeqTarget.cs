@@ -75,6 +75,11 @@ namespace NLog.Targets.Seq
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
 
         /// <summary>
+        /// Use default credentials
+        /// </summary>
+        public bool UseDefaultCredentials { get; set; }
+
+        /// <summary>
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
@@ -126,13 +131,16 @@ namespace NLog.Targets.Seq
 
                 _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
 
-                HttpClientHandler handler = null;
+                var handler = new HttpClientHandler
+                {
+                    UseDefaultCredentials = UseDefaultCredentials
+                };
 
                 var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
                 if (!string.IsNullOrEmpty(proxyAddress))
-                    handler = new HttpClientHandler {Proxy = new WebProxy(new Uri(proxyAddress), true)};
+                    handler.Proxy = new WebProxy(new Uri(proxyAddress), true);
                 
-                _httpClient = handler == null ? new HttpClient() : new HttpClient(handler);
+                _httpClient = new HttpClient(handler);
             }
 
             base.InitializeTarget();
