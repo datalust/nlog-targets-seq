@@ -72,6 +72,7 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
+        
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
         /// <summary>
         /// Use default credentials
