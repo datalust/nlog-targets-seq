@@ -68,11 +68,16 @@ namespace NLog.Targets.Seq
         /// A Seq <i>API key</i> that authenticates the client to the Seq server.
         /// </summary>
         public string ApiKey { get => (_apiKey as SimpleLayout)?.Text; set => _apiKey = value ?? string.Empty; }
-        
+
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
+        
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
+        /// <summary>
+        /// Use default credentials
+        /// </summary>
+        public bool UseDefaultCredentials { get; set; }
 
         /// <summary>
         /// A list of properties that will be attached to the events.
@@ -91,7 +96,7 @@ namespace NLog.Targets.Seq
             get => TemplatedClefLayout.MaxRecursionLimit;
             set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; }
         }
-        
+
         /// <summary>
         /// Construct a <see cref="SeqTarget"/>.
         /// </summary>
@@ -102,7 +107,7 @@ namespace NLog.Targets.Seq
             OptimizeBufferReuse = true;
             JsonPayloadMaxLength = 128 * 1024;
         }
-        
+
         /// <summary>
         /// Initializes the target. Can be used by inheriting classes
         /// to initialize logging.
@@ -130,8 +135,19 @@ namespace NLog.Targets.Seq
 
                 var proxyAddress = _proxyAddress?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
                 if (!string.IsNullOrEmpty(proxyAddress))
-                    handler = new HttpClientHandler {Proxy = new WebProxy(new Uri(proxyAddress), true)};
-                
+                    handler = new HttpClientHandler { Proxy = new WebProxy(new Uri(proxyAddress), true) };
+                if (UseDefaultCredentials)
+                {
+                    if (handler != null)
+                    {
+                        handler.UseDefaultCredentials = UseDefaultCredentials;
+                    }
+                    else
+                    {
+                        handler = new HttpClientHandler { UseDefaultCredentials = UseDefaultCredentials };
+                    }
+                }
+
                 _httpClient = handler == null ? new HttpClient() : new HttpClient(handler);
             }
 
@@ -187,7 +203,7 @@ namespace NLog.Targets.Seq
             var request = new HttpRequestMessage(HttpMethod.Post, _webRequestUri);
             if (!string.IsNullOrWhiteSpace(_headerApiKey))
                 request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
-            
+
             List<AsyncLogEventInfo> extraBatch = null;
             var totalPayload = 0;
             var payload = new StringBuilder();
@@ -222,7 +238,7 @@ namespace NLog.Targets.Seq
             }
 
             request.Content = new StringContent(payload.ToString(), Utf8, SeqApi.CompactLogEventFormatMediaType);
-            
+
             // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
             // level changes sent by the server.
 
