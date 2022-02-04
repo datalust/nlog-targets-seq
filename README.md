@@ -65,6 +65,50 @@ The `target` declaration in _NLog.config_ can be expanded with additional proper
 
 Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above. The value can be any supported [layout renderer](https://github.com/NLog/NLog/wiki/Layout-Renderers).
 
+### Configuration in appsettings.json
+NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration in appsettings.json](https://github.com/NLog/NLog.Extensions.Logging/wiki/NLog-configuration-with-appsettings.json)
+
+```json
+{
+  "NLog": {
+    "throwConfigExceptions": true,
+    "targets": {
+      "seq": {
+        "type": "BufferingWrapper",
+        "bufferSize": 200,
+        "flushTimeout": 2000,
+        "slidingTimeout": false,
+        "target": {
+          "type": "Seq",
+          "serverUrl": "http://localhost:5341",
+          "apiKey": "",
+          "properties": [
+          {
+            "name": "Source",
+            "layout": "${Logger}",
+          },
+          {
+            "name": "ThreadId",
+            "layout": "${ThreadId}",
+            "as": "number"
+          },
+          {
+            "name": "MachineName",
+            "layout": "${MachineName}",
+          }]
+        }
+      }
+    },
+    "rules": [
+    {
+      "logger": "*",
+      "minLevel": "Info",
+      "writeTo": "seq"
+    }]
+  }
+}
+```
+
 ### Acknowledgements
 
 The target is based on the earlier [_Seq.Client.NLog_ project](https://github.com/datalust/seq-client), and benefits from many contributions accepted into that repository.
