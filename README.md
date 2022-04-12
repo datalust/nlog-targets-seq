@@ -85,16 +85,16 @@ NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration i
           "properties": [
           {
             "name": "Source",
-            "layout": "${Logger}",
+            "value": "${Logger}",
           },
           {
             "name": "ThreadId",
-            "layout": "${ThreadId}",
+            "value": "${ThreadId}",
             "as": "number"
           },
           {
             "name": "MachineName",
-            "layout": "${MachineName}",
+            "value": "${MachineName}",
           }]
         }
       }
