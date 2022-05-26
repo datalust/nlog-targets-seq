@@ -13,6 +13,10 @@ dotnet add package NLog.Targets.Seq
 Then, add the target and rules entries to your NLog configuration:
 
 ```xml
+<nlog>
+  <extensions>
+    <add assembly="NLog.Targets.Seq"/>
+  </extensions>
   <targets>
     <target name="seq" xsi:type="BufferingWrapper" bufferSize="1000"
             flushTimeout="2000" slidingTimeout="false">
@@ -22,6 +26,7 @@ Then, add the target and rules entries to your NLog configuration:
   <rules>
     <logger name="*" minlevel="Info" writeTo="seq" />
   </rules>
+</nlog>
 ```
 
 The `BufferingWrapper` ensures that writes to Seq do not block the application.
@@ -72,6 +77,9 @@ NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration i
 {
   "NLog": {
     "throwConfigExceptions": true,
+    "extensions": [
+      { "assembly": "NLog.Targets.Seq" }
+    ],
     "targets": {
       "seq": {
         "type": "BufferingWrapper",
