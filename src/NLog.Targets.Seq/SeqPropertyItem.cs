@@ -24,14 +24,6 @@ namespace NLog.Targets.Seq
     public sealed class SeqPropertyItem
     {
         /// <summary>
-        /// Initialize parameter defaults.
-        /// </summary>
-        public SeqPropertyItem()        
-        {
-            As = "string";
-        }
-
-        /// <summary>
         /// The name of the property.
         /// </summary>
         [RequiredParameter]
@@ -44,13 +36,22 @@ namespace NLog.Targets.Seq
         public Layout Value { get; set; }
 
         /// <summary>
+        /// Gets or sets whether value should be handled as string-value.
+        /// </summary>
+        /// <remarks>
+        /// Matches <see cref="NLog.Layouts.JsonAttribute.Encode"/>
+        /// </remarks>
+        public bool AsString { get; set; } = true;
+
+        /// <summary>
         /// Either "string", which is the default, or "number", which
         /// will cause values of this type to be converted to numbers for
         /// storage.
         /// </summary>
-        [RequiredParameter]
-        public string As { get; set; }
-
-        internal bool IsNumber => As == "number";
+        public string As
+        {
+            get => AsString ? "string" : "number";
+            set => AsString = value != "number";
+        }
     }
 }

@@ -116,7 +116,7 @@ namespace NLog.Targets.Seq
         {
             foreach (var prop in Properties)
             {
-                var attr = new JsonAttribute(prop.Name, prop.Value, !prop.IsNumber);
+                var attr = new JsonAttribute(prop.Name, prop.Value, prop.AsString);
                 TextClefLayout.Attributes.Add(attr);
                 TemplatedClefLayout.Attributes.Add(attr);
             }
