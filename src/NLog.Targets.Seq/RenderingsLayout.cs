@@ -22,10 +22,12 @@ namespace NLog.Targets.Seq
 {
     class RenderingsLayout : Layout
     {
-        IJsonConverter _jsonConverter;
-        IJsonConverter JsonConverter => _jsonConverter ??=
-            (IJsonConverter) LoggingConfiguration?.LogFactory.ServiceRepository.GetService(typeof(IJsonConverter))
-            ?? throw new InvalidOperationException("The layout is not attached to a logging configuration with `IJsonConverter` available.");
+        readonly Lazy<IJsonConverter> _jsonConverter;
+
+        public RenderingsLayout(Lazy<IJsonConverter> jsonConverter)
+        {
+            _jsonConverter = jsonConverter;
+        }
 
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
@@ -78,7 +80,7 @@ namespace NLog.Targets.Seq
 
                     output.Append(nextDelimiter);
                     nextDelimiter = ",";
-                    JsonConverter.SerializeObject(space.ToString(), output);
+                    _jsonConverter.Value.SerializeObject(space.ToString(), output);
                 }
 
                 return output;
@@ -95,6 +97,5 @@ namespace NLog.Targets.Seq
                 output?.Append("]");
             }
         }
-
     }
 }

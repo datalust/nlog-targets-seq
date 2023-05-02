@@ -9,7 +9,6 @@
     <PackageId>NLog.Targets.Seq.Tests</PackageId>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <TreatSpecificWarningsAsErrors />
-    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
