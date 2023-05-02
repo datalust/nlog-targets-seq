@@ -42,9 +42,8 @@ namespace NLog.Targets.Seq
                 Attributes.Add(_messageAttribute);
             }
 
-            IncludeAllProperties = true;
-            IncludeMdc = true;
-            IncludeMdlc = true;
+            IncludeEventProperties = true;
+            IncludeScopeProperties = true;
             SuppressSpaces = true;
         }
     }

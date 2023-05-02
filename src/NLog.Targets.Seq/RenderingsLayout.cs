@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.IO;
 using System.Text;
-using NLog.Config;
 using NLog.Layouts;
 using NLog.MessageTemplates;
 
 namespace NLog.Targets.Seq
 {
-    [ThreadSafe]
     class RenderingsLayout : Layout
     {
         IJsonConverter _jsonConverter;
-        IJsonConverter JsonConverter => _jsonConverter ?? (_jsonConverter = ConfigurationItemFactory.Default.JsonConverter);
+        IJsonConverter JsonConverter => _jsonConverter ??=
+            (IJsonConverter) LoggingConfiguration?.LogFactory.ServiceRepository.GetService(typeof(IJsonConverter))
+            ?? throw new InvalidOperationException("The layout is not attached to a logging configuration with `IJsonConverter` available.");
 
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {

@@ -1,6 +1,6 @@
 # NLog.Targets.Seq [![NuGet Pre Release](https://img.shields.io/nuget/vpre/NLog.Targets.Seq.svg)](https://nuget.org/packages/NLog.Targets.Seq) [![Build status](https://ci.appveyor.com/api/projects/status/o22e6dq0mkftaggc?svg=true)](https://ci.appveyor.com/project/datalust/nlog-targets-seq)  [![Join the chat at https://gitter.im/datalust/seq](https://img.shields.io/gitter/room/datalust/seq.svg)](https://gitter.im/datalust/seq)
 
-An NLog target that writes events to [Seq](https://getseq.net). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
+An NLog target that writes events to [Seq](https://datalust.co/seq). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
 
 ### Getting started
 
@@ -71,6 +71,7 @@ The `target` declaration in _NLog.config_ can be expanded with additional proper
 Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above. The value can be any supported [layout renderer](https://github.com/NLog/NLog/wiki/Layout-Renderers).
 
 ### Configuration in appsettings.json
+
 NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration in appsettings.json](https://github.com/NLog/NLog.Extensions.Logging/wiki/NLog-configuration-with-appsettings.json)
 
 ```json
@@ -93,7 +94,7 @@ NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration i
           "properties": [
           {
             "name": "Source",
-            "value": "${Logger}",
+            "value": "${Logger}"
           },
           {
             "name": "ThreadId",
@@ -102,7 +103,7 @@ NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration i
           },
           {
             "name": "MachineName",
-            "value": "${MachineName}",
+            "value": "${MachineName}"
           }]
         }
       }
