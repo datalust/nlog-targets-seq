@@ -1,14 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net4.7.2;net6.0</TargetFrameworks>
-    <AssemblyName>NLog.Targets.Seq.Tests</AssemblyName>
+    <TargetFrameworks>net472;net6.0</TargetFrameworks>
     <AssemblyOriginatorKeyFile>../../asset/nlog-targets-seq.snk</AssemblyOriginatorKeyFile>
     <SignAssembly>true</SignAssembly>
     <PublicSign Condition=" '$(OS)' != 'Windows_NT' ">true</PublicSign>
-    <PackageId>NLog.Targets.Seq.Tests</PackageId>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <TreatSpecificWarningsAsErrors />
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +19,12 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" PrivateAssets="all" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+  
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+    <!-- This works around occurrences of Error CS0656 : Missing compiler required member
+    'Microsoft.CSharp.RuntimeBinder.CSharpArgumentInfo.Create' where `dynamic` is used. -->
+    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
 </Project>
