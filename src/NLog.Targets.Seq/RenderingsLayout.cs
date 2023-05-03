@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.IO;
 using System.Text;
-using NLog.Config;
 using NLog.Layouts;
 using NLog.MessageTemplates;
 
 namespace NLog.Targets.Seq
 {
-    [ThreadSafe]
     class RenderingsLayout : Layout
     {
-        IJsonConverter _jsonConverter;
-        IJsonConverter JsonConverter => _jsonConverter ?? (_jsonConverter = ConfigurationItemFactory.Default.JsonConverter);
+        readonly Lazy<IJsonConverter> _jsonConverter;
+
+        public RenderingsLayout(Lazy<IJsonConverter> jsonConverter)
+        {
+            _jsonConverter = jsonConverter;
+        }
 
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
@@ -77,7 +80,7 @@ namespace NLog.Targets.Seq
 
                     output.Append(nextDelimiter);
                     nextDelimiter = ",";
-                    JsonConverter.SerializeObject(space.ToString(), output);
+                    _jsonConverter.Value.SerializeObject(space.ToString(), output);
                 }
 
                 return output;
@@ -94,6 +97,5 @@ namespace NLog.Targets.Seq
                 output?.Append("]");
             }
         }
-
     }
 }

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using NLog.Layouts;
 
 namespace NLog.Targets.Seq
@@ -23,28 +24,28 @@ namespace NLog.Targets.Seq
             _levelAttribute = new JsonAttribute("@l", new SimpleLayout("${level}")),
             _exceptionAttribute = new JsonAttribute("@x", new SimpleLayout("${exception:format=toString}")),
             _messageAttribute = new JsonAttribute("@m", new SimpleLayout("${message}")),
-            _messageTemplateAttribute = new JsonAttribute("@mt", new SimpleLayout("${message:raw=true}")),
-            _renderingsAttribute = new JsonAttribute("@r", new RenderingsLayout(), encode: false);
+            _messageTemplateAttribute = new JsonAttribute("@mt", new SimpleLayout("${message:raw=true}"));
 
         public CompactJsonLayout(bool usesTemplate)
         {
             Attributes.Add(_timestampAttribute);
             Attributes.Add(_levelAttribute);
             Attributes.Add(_exceptionAttribute);
-
+            
             if (usesTemplate)
             {
                 Attributes.Add(_messageTemplateAttribute);
-                Attributes.Add(_renderingsAttribute);
+                
+                var renderingsAttribute = new JsonAttribute("@r", new RenderingsLayout(new Lazy<IJsonConverter>(ResolveService<IJsonConverter>)), encode: false);
+                Attributes.Add(renderingsAttribute);
             }
             else
             {
                 Attributes.Add(_messageAttribute);
             }
 
-            IncludeAllProperties = true;
-            IncludeMdc = true;
-            IncludeMdlc = true;
+            IncludeEventProperties = true;
+            IncludeScopeProperties = true;
             SuppressSpaces = true;
         }
     }

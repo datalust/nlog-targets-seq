@@ -104,7 +104,6 @@ namespace NLog.Targets.Seq
         {
             Properties = new List<SeqPropertyItem>();
             MaxRecursionLimit = 0;  // Default behavior for Serilog
-            OptimizeBufferReuse = true;
             JsonPayloadMaxLength = 128 * 1024;
         }
 
