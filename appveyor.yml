@@ -1,6 +1,6 @@
 version: '{build}'
 skip_tags: true
-image: Visual Studio 2019
+image: Visual Studio 2022
 install:
   - ps: mkdir -Force ".\build\" | Out-Null 
   - ps: nuget update -Self
@@ -12,7 +12,7 @@ artifacts:
 deploy:
 - provider: NuGet
   api_key:
-    secure: 71c2lLlQfEUp7lWA9Zo+BneSkHO5xuZVeIt+bqmqlzHg4g3NgVf0Buwp4pAhoGO5
+    secure: EWuj9Uh1xsnPDf7JZDzW4XiQJ4+If7OjsOmw/b3dvRUroNB+2CdqnXAWM2vkOPL2
   skip_symbols: true
   on:
     branch: /^(main|dev)$/

@@ -1,6 +1,6 @@
 # NLog.Targets.Seq [![NuGet Pre Release](https://img.shields.io/nuget/vpre/NLog.Targets.Seq.svg)](https://nuget.org/packages/NLog.Targets.Seq) [![Build status](https://ci.appveyor.com/api/projects/status/o22e6dq0mkftaggc?svg=true)](https://ci.appveyor.com/project/datalust/nlog-targets-seq)  [![Join the chat at https://gitter.im/datalust/seq](https://img.shields.io/gitter/room/datalust/seq.svg)](https://gitter.im/datalust/seq)
 
-An NLog target that writes events to [Seq](https://getseq.net). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
+An NLog target that writes events to [Seq](https://datalust.co/seq). The target takes full advantage of the structured logging support in **NLog 4.5** to provide hassle-free filtering, searching and analysis.
 
 ### Getting started
 
@@ -13,6 +13,10 @@ dotnet add package NLog.Targets.Seq
 Then, add the target and rules entries to your NLog configuration:
 
 ```xml
+<nlog>
+  <extensions>
+    <add assembly="NLog.Targets.Seq"/>
+  </extensions>
   <targets>
     <target name="seq" xsi:type="BufferingWrapper" bufferSize="1000"
             flushTimeout="2000" slidingTimeout="false">
@@ -22,6 +26,7 @@ Then, add the target and rules entries to your NLog configuration:
   <rules>
     <logger name="*" minlevel="Info" writeTo="seq" />
   </rules>
+</nlog>
 ```
 
 The `BufferingWrapper` ensures that writes to Seq do not block the application.
@@ -64,6 +69,54 @@ The `target` declaration in _NLog.config_ can be expanded with additional proper
 ```
 
 Any properties specified here will be attached to all outgoing events. You can see examples of `ThreadId` and `MachineName` in the screenshot above. The value can be any supported [layout renderer](https://github.com/NLog/NLog/wiki/Layout-Renderers).
+
+### Configuration in appsettings.json
+
+NLog.Extensions.Logging ver. 1.5.0 adds support for having [NLog configuration in appsettings.json](https://github.com/NLog/NLog.Extensions.Logging/wiki/NLog-configuration-with-appsettings.json)
+
+```json
+{
+  "NLog": {
+    "throwConfigExceptions": true,
+    "extensions": [
+      { "assembly": "NLog.Targets.Seq" }
+    ],
+    "targets": {
+      "seq": {
+        "type": "BufferingWrapper",
+        "bufferSize": 200,
+        "flushTimeout": 2000,
+        "slidingTimeout": false,
+        "target": {
+          "type": "Seq",
+          "serverUrl": "http://localhost:5341",
+          "apiKey": "",
+          "properties": [
+          {
+            "name": "Source",
+            "value": "${Logger}"
+          },
+          {
+            "name": "ThreadId",
+            "value": "${ThreadId}",
+            "as": "number"
+          },
+          {
+            "name": "MachineName",
+            "value": "${MachineName}"
+          }]
+        }
+      }
+    },
+    "rules": [
+    {
+      "logger": "*",
+      "minLevel": "Info",
+      "writeTo": "seq"
+    }]
+  }
+}
+```
 
 ### Acknowledgements
 
