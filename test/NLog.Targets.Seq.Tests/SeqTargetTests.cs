@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Xunit;
 
 namespace NLog.Targets.Seq.Tests
@@ -23,8 +24,9 @@ namespace NLog.Targets.Seq.Tests
 
             target.TestInitialize();
 
-            var json = target.RenderCompactJsonLine(evt);
-            output.WriteLine(json);
+            var payload = new StringBuilder();
+            target.RenderCompactJsonLine(evt, payload);
+            output.WriteLine(payload.ToString());
         }
 
         JObject AssertValidJson(Action<ILogger> act, IEnumerable<SeqPropertyItem> properties = null, int? maxRecursionLimit = null)
@@ -59,7 +61,19 @@ namespace NLog.Targets.Seq.Tests
         [Fact]
         public void AMinimalEventIsValidJson()
         {
-            AssertValidJson(log => log.Info("One {Property}", 42));
+            var evt = AssertValidJson(log => log.Info("One {Property}", 42));
+            Assert.Equal(42, evt["Property"].Value<int>());
+            Assert.Equal("One {Property}", evt["@mt"].Value<string>());
+        }
+
+        [Fact]
+        public void APositionalEventIsValidJson()
+        {
+            var logEvent = LogEventInfo.Create(LogLevel.Info, null, null, 42);
+            logEvent.Properties["Property"] = 42;
+            var evt = AssertValidJson(log => log.Log(logEvent));
+            Assert.Equal(42, evt["Property"].Value<int>());
+            Assert.Equal("42", evt["@m"].Value<string>());
         }
 
         [Fact]
@@ -69,6 +83,7 @@ namespace NLog.Targets.Seq.Tests
             logEvent.Properties["Answer"] = 42;
             var evt = AssertValidJson(log => log.Info(logEvent));
             Assert.Equal(42, evt["Answer"].Value<int>());
+            Assert.Equal("Hello ", evt["@mt"].Value<string>());
         }
 
         [Fact]

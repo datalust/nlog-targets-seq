@@ -13,36 +13,30 @@
 // limitations under the License.
 
 using System;
+using NLog.Config;
 using NLog.Layouts;
 
 namespace NLog.Targets.Seq
 {
+    [ThreadAgnostic]
     class CompactJsonLayout : JsonLayout
     {
         readonly JsonAttribute
-            _timestampAttribute = new JsonAttribute("@t", new SimpleLayout("${date:o}")),
+            _timestampAttribute = new JsonAttribute("@t", new SimpleLayout("${date:format=o}")),
             _levelAttribute = new JsonAttribute("@l", new SimpleLayout("${level}")),
             _exceptionAttribute = new JsonAttribute("@x", new SimpleLayout("${exception:format=toString}")),
-            _messageAttribute = new JsonAttribute("@m", new SimpleLayout("${message}")),
-            _messageTemplateAttribute = new JsonAttribute("@mt", new SimpleLayout("${message:raw=true}"));
+            _messageAttribute = new JsonAttribute("@m", new FormattedMessageLayout()),
+            _messageTemplateAttribute = new JsonAttribute("@mt", new SimpleLayout("${onhasproperties:${message:raw=true}}"));
 
-        public CompactJsonLayout(bool usesTemplate)
+        public CompactJsonLayout()
         {
             Attributes.Add(_timestampAttribute);
             Attributes.Add(_levelAttribute);
             Attributes.Add(_exceptionAttribute);
-            
-            if (usesTemplate)
-            {
-                Attributes.Add(_messageTemplateAttribute);
-                
-                var renderingsAttribute = new JsonAttribute("@r", new RenderingsLayout(new Lazy<IJsonConverter>(ResolveService<IJsonConverter>)), encode: false);
-                Attributes.Add(renderingsAttribute);
-            }
-            else
-            {
-                Attributes.Add(_messageAttribute);
-            }
+            Attributes.Add(_messageTemplateAttribute);
+            var renderingsAttribute = new JsonAttribute("@r", new RenderingsLayout(new Lazy<IJsonConverter>(ResolveService<IJsonConverter>)), encode: false);
+            Attributes.Add(renderingsAttribute);
+            Attributes.Add(_messageAttribute);
 
             IncludeEventProperties = true;
             IncludeScopeProperties = true;
