@@ -35,6 +35,8 @@ namespace NLog.Targets.Seq
         Layout _serverUrl;
         Layout _apiKey;
         Layout _proxyAddress;
+        readonly JsonLayout _compactLayout = new CompactJsonLayout();
+        readonly char[] _reusableEncodingBuffer = new char[32 * 1024];  // Avoid large-object-heap
 
         Uri _webRequestUri;
         string _headerApiKey;
@@ -46,12 +48,12 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// The layout used to format `LogEvent`s as compact JSON.
         /// </summary>
-        public JsonLayout TemplatedClefLayout { get; } = new CompactJsonLayout(true);
+        public JsonLayout TemplatedClefLayout => _compactLayout;
 
         /// <summary>
         /// The layout used to format `LogEvent`s as compact JSON.
         /// </summary>
-        public JsonLayout TextClefLayout { get; } = new CompactJsonLayout(false);
+        public JsonLayout TextClefLayout => _compactLayout;
 
         /// <summary>
         /// Maximum size allowed for JSON payload sent to Seq-Server. Discards log events that are larger than limit.
@@ -72,8 +74,8 @@ namespace NLog.Targets.Seq
         /// <summary>
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
-        
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
+
         /// <summary>
         /// Use default credentials
         /// </summary>
@@ -93,8 +95,26 @@ namespace NLog.Targets.Seq
         /// </summary>
         public int MaxRecursionLimit
         {
-            get => TemplatedClefLayout.MaxRecursionLimit;
-            set { TemplatedClefLayout.MaxRecursionLimit = value; TextClefLayout.MaxRecursionLimit = value; }
+            get => _compactLayout.MaxRecursionLimit;
+            set => _compactLayout.MaxRecursionLimit = value;
+        }
+
+        /// <summary>
+        /// Gets or sets whether to include the contents of the <see cref="ScopeContext"/> dictionary.
+        /// </summary>
+        public bool IncludeScopeProperties
+        {
+            get => _compactLayout.IncludeScopeProperties;
+            set => _compactLayout.IncludeScopeProperties = value;
+        }
+
+        /// <summary>
+        /// List of property names to exclude from LogEventInfo-Properties or ScopeContext-Properties.
+        /// </summary>
+        public ISet<string> ExcludeProperties
+        {
+            get => _compactLayout.ExcludeProperties;
+            set => _compactLayout.ExcludeProperties = value;
         }
 
         /// <summary>
@@ -116,8 +136,7 @@ namespace NLog.Targets.Seq
             foreach (var prop in Properties)
             {
                 var attr = new JsonAttribute(prop.Name, prop.Value, prop.AsString);
-                TextClefLayout.Attributes.Add(attr);
-                TemplatedClefLayout.Attributes.Add(attr);
+                AddJsonAttribute(_compactLayout, attr);
             }
 
             if (!string.IsNullOrEmpty(ServerUrl))
@@ -199,12 +218,7 @@ namespace NLog.Targets.Seq
             if (_webRequestUri == null)
                 return;
 
-            var request = new HttpRequestMessage(HttpMethod.Post, _webRequestUri);
-            if (!string.IsNullOrWhiteSpace(_headerApiKey))
-                request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
-
             List<AsyncLogEventInfo> extraBatch = null;
-            var totalPayload = 0;
             var payload = new StringBuilder();
 
             for (var i = 0; i < logEvents.Count; ++i)
@@ -214,29 +228,52 @@ namespace NLog.Targets.Seq
                 if (evt.Level < _minimumLevel)
                     continue;
 
-                var json = RenderCompactJsonLine(evt);
-
-                if (JsonPayloadMaxLength > 0)
+                int orgLength = payload.Length;
+                var jsonLength = RenderCompactJsonLine(evt, payload);
+                if (jsonLength > JsonPayloadMaxLength)
                 {
-                    if (json.Length > JsonPayloadMaxLength)
-                    {
-                        InternalLogger.Warn("Seq(Name={0}): Event JSON representation exceeds the char limit: {1} > {2}", Name, json.Length, JsonPayloadMaxLength);
-                        continue;
-                    }
-                    if (totalPayload + json.Length > JsonPayloadMaxLength)
-                    {
-                        extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
-                        for (; i < logEvents.Count; ++i)
-                            extraBatch.Add(logEvents[i]);
-                        break;
-                    }
+                    InternalLogger.Warn("Seq(Name={0}): LogEvent JSON-length exceeds JsonPayloadMaxLength: {1} > {2}", Name, jsonLength, JsonPayloadMaxLength);
+                    payload.Length = orgLength;
+                    logEvents[i].Continuation(new ArgumentException("Seq LogEvent JSON-length exceeds JsonPayloadMaxLength"));
                 }
-
-                totalPayload += json.Length;
-                payload.AppendLine(json);
+                else if (payload.Length > JsonPayloadMaxLength)
+                {
+                    extraBatch = new List<AsyncLogEventInfo>(logEvents.Count - i);
+                    for (; i < logEvents.Count; ++i)
+                        extraBatch.Add(logEvents[i]);
+                    payload.Length = orgLength;
+                    break;
+                }
+                else if (jsonLength > 0)
+                {
+                    payload.AppendLine();
+                }
             }
 
-            request.Content = new StringContent(payload.ToString(), Utf8, SeqApi.CompactLogEventFormatMediaType);
+            if (payload.Length > 0)
+            {
+                await SendPayload(payload).ConfigureAwait(false);
+            }
+
+            var completedCount = logEvents.Count - (extraBatch?.Count ?? 0);
+            for (var i = 0; i < completedCount; ++i)
+                logEvents[i].Continuation(null);
+
+            if (extraBatch != null)
+            {
+                await PostBatch(extraBatch).ConfigureAwait(false);
+            }
+        }
+
+        private async Task SendPayload(StringBuilder payload)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, _webRequestUri);
+            if (!string.IsNullOrWhiteSpace(_headerApiKey))
+                request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
+
+            var httpContent = new ByteArrayContent(EncodePayload(Utf8, payload));
+            httpContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(SeqApi.CompactLogEventFormatMediaType) { CharSet = Utf8.WebName };
+            request.Content = httpContent;
 
             // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
             // level changes sent by the server.
@@ -260,27 +297,49 @@ namespace NLog.Targets.Seq
                     }
                 }
             }
+        }
 
-            var completedCount = logEvents.Count - (extraBatch?.Count ?? 0);
-            for (var i = 0; i < completedCount; ++i)
-                logEvents[i].Continuation(null);
-
-            if (extraBatch != null)
+        private byte[] EncodePayload(Encoding encoder, StringBuilder payload)
+        {
+            lock (_reusableEncodingBuffer)
             {
-                await PostBatch(extraBatch).ConfigureAwait(false);
+                int totalLength = payload.Length;
+                if (totalLength < _reusableEncodingBuffer.Length)
+                {
+                    payload.CopyTo(0, _reusableEncodingBuffer, 0, payload.Length);
+                    return encoder.GetBytes(_reusableEncodingBuffer, 0, totalLength);
+                }
+                else
+                {
+                    return encoder.GetBytes(payload.ToString());
+                }
             }
         }
 
-        internal string RenderCompactJsonLine(LogEventInfo evt)
+        internal int RenderCompactJsonLine(LogEventInfo evt, StringBuilder payload)
         {
-            var hasProperties = evt.HasProperties && evt.Properties.Count > 0;
-            var json = RenderLogEvent(hasProperties ? TemplatedClefLayout : TextClefLayout, evt);
-            return json;
+            var orgLength = payload.Length;
+            _compactLayout.Render(evt, payload);
+            var jsonLength = payload.Length - orgLength;
+            return jsonLength;
         }
 
         internal void TestInitialize()
         {
             InitializeTarget();
+        }
+
+        private static void AddJsonAttribute(JsonLayout jsonLayout, JsonAttribute jsonAttribute)
+        {
+            for (int i = jsonLayout.Attributes.Count - 1; i >= 0; --i)
+            {
+                if (jsonLayout.Attributes[i].Name == jsonAttribute.Name)
+                {
+                    jsonLayout.Attributes.RemoveAt(i);
+                }
+            }
+
+            jsonLayout.Attributes.Add(jsonAttribute);
         }
 
         /// <inheritdoc />
