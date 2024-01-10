@@ -32,9 +32,10 @@ namespace NLog.Targets.Seq.Tests
         JObject AssertValidJson(Action<ILogger> act, IEnumerable<SeqPropertyItem> properties = null, int? maxRecursionLimit = null)
         {
             var logger = LogManager.GetCurrentClassLogger();
+            var config = new LoggingConfiguration();
             var target = new CollectingTarget();
-
-            SimpleConfigurator.ConfigureForTargetLogging(target, LogLevel.Trace);
+            config.AddRuleForAllLevels(target);
+            LogManager.Configuration = config;
 
             act(logger);
 
