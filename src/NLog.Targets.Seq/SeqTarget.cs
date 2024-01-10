@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 using NLog.Common;
 using NLog.Config;
 using NLog.Layouts;
+using NLog.Targets.Seq.Layouts;
 
 // ReSharper disable MemberCanBePrivate.Global
 

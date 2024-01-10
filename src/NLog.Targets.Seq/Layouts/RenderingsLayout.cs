@@ -18,7 +18,7 @@ using NLog.Config;
 using NLog.Layouts;
 using NLog.MessageTemplates;
 
-namespace NLog.Targets.Seq
+namespace NLog.Targets.Seq.Layouts
 {
     [ThreadAgnostic]
     class RenderingsLayout : Layout
