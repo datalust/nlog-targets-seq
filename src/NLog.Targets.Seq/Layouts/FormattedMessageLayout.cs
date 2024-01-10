@@ -16,7 +16,7 @@ using System.Text;
 using NLog.Config;
 using NLog.Layouts;
 
-namespace NLog.Targets.Seq
+namespace NLog.Targets.Seq.Layouts
 {
     [ThreadAgnostic]
     class FormattedMessageLayout : Layout
