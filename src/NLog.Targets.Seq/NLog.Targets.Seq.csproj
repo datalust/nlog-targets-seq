@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Description>An NLog target that writes structured log events to Seq</Description>
     <Authors>Datalust;Contributors</Authors>
-    <VersionPrefix>3.1.0</VersionPrefix>
+    <VersionPrefix>3.1.1</VersionPrefix>
     <TargetFrameworks>net45;net462;netstandard2.0;net6.0</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
