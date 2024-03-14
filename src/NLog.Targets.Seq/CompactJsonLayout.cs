@@ -28,6 +28,8 @@ namespace NLog.Targets.Seq
             _messageAttribute = new JsonAttribute("@m", new FormattedMessageLayout()),
             _messageTemplateAttribute = new JsonAttribute("@mt", new SimpleLayout("${onhasproperties:${message:raw=true}}"));
 
+        public Layout LogLevel { get => _levelAttribute.Layout; set => _levelAttribute.Layout = value; }
+
         public CompactJsonLayout()
         {
             Attributes.Add(_timestampAttribute);

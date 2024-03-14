@@ -35,13 +35,13 @@ namespace NLog.Targets.Seq
         Layout _serverUrl;
         Layout _apiKey;
         Layout _proxyAddress;
-        readonly JsonLayout _compactLayout = new CompactJsonLayout();
+        readonly CompactJsonLayout _compactLayout = new CompactJsonLayout();
         readonly char[] _reusableEncodingBuffer = new char[32 * 1024];  // Avoid large-object-heap
 
         Uri _webRequestUri;
         string _headerApiKey;
         HttpClient _httpClient;
-        LogLevel _minimumLevel = LogLevel.Trace;
+        LogLevel _minimumLevel = NLog.LogLevel.Trace;
 
         static readonly UTF8Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
@@ -75,6 +75,11 @@ namespace NLog.Targets.Seq
         /// The address of the proxy to use, including port separated by a colon. If not provided, default operating system proxy will be used.
         /// </summary>
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
+
+        /// <summary>
+        /// Override the mapping from NLog LogLevel to Seq LogLevel. Default output is ${level}
+        /// </summary>
+        public Layout SeqLevel { get => _compactLayout.LogLevel; set => _compactLayout.LogLevel = value; }
 
         /// <summary>
         /// Use default credentials
