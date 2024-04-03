@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using NLog;
 
 namespace Example
@@ -10,14 +9,6 @@ namespace Example
 
         public static void Main()
         {
-            using var listener = new ActivityListener();
-            listener.ShouldListenTo = _ => true;
-            listener.Sample = delegate { return ActivitySamplingResult.AllData; };
-            ActivitySource.AddActivityListener(listener);
-
-            var source = new ActivitySource("Example");
-            using var activity = source.StartActivity();
-            
             const string server = "Seq", library = "NLog";
 
             // Structured logging: two named properties are captured using the message template:
