@@ -197,6 +197,15 @@ namespace NLog.Targets.Seq.Tests
         }
 
         [Fact]
+        public void TraceAndSpanIdAreIgnoredWhenMissing()
+        {
+            Assert.Null(Activity.Current);
+            var evt = AssertValidJson(log => log.Info("Hello"));
+            Assert.False(evt.ContainsKey("@tr"));
+            Assert.False(evt.ContainsKey("@sp"));
+        }
+        
+        [Fact]
         public void TraceAndSpanIdAreCollectedWhenPresent()
         {
             using var listener = new ActivityListener();
