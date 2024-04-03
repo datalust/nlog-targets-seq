@@ -30,6 +30,8 @@ namespace NLog.Targets.Seq.Layouts
             _traceIdAttribute = new("@tr", new TraceIdLayout()),
             _spanIdAttribute = new("@sp", new SpanIdLayout());
 
+        public Layout LogLevel { get => _levelAttribute.Layout; set => _levelAttribute.Layout = value; }
+
         public CompactJsonLayout()
         {
             Attributes.Add(_timestampAttribute);

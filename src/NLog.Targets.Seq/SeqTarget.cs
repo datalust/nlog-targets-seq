@@ -23,6 +23,8 @@ using NLog.Config;
 using NLog.Layouts;
 using NLog.Targets.Seq.Layouts;
 
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable UnusedMember.Global
 // ReSharper disable MemberCanBePrivate.Global
 
 namespace NLog.Targets.Seq
@@ -36,11 +38,10 @@ namespace NLog.Targets.Seq
         Layout _serverUrl;
         Layout _apiKey;
         Layout _proxyAddress;
-        readonly JsonLayout _compactLayout = new CompactJsonLayout();
+        readonly CompactJsonLayout _compactLayout = new CompactJsonLayout();
         readonly char[] _reusableEncodingBuffer = new char[32 * 1024];  // Avoid large-object-heap
 
         Uri _webRequestUri;
-        string _headerApiKey;
         HttpClient _httpClient;
         LogLevel _minimumLevel = LogLevel.Trace;
 
@@ -78,6 +79,11 @@ namespace NLog.Targets.Seq
         public string ProxyAddress { get => (_proxyAddress as SimpleLayout)?.Text; set => _proxyAddress = value ?? string.Empty; }
 
         /// <summary>
+        /// Override the mapping from NLog LogLevel to Seq LogLevel. Default output is ${level}
+        /// </summary>
+        public Layout SeqLevel { get => _compactLayout.LogLevel; set => _compactLayout.LogLevel = value; }
+
+        /// <summary>
         /// Use default credentials
         /// </summary>
         public bool UseDefaultCredentials { get; set; }
@@ -86,7 +92,7 @@ namespace NLog.Targets.Seq
         /// A list of properties that will be attached to the events.
         /// </summary>
         [ArrayParameter(typeof(SeqPropertyItem), "property")]
-        public IList<SeqPropertyItem> Properties { get; }
+        public IList<SeqPropertyItem> Properties { get; } = new List<SeqPropertyItem>();
 
         /// <summary>
         /// How far should the JSON serializer follow object references before backing off
@@ -119,11 +125,16 @@ namespace NLog.Targets.Seq
         }
 
         /// <summary>
+        /// Additional HTTP headers to attach to outgoing HTTP requests made by the sink.
+        /// </summary>
+        [ArrayParameter(typeof(SeqHttpHeaderItem), "header")]
+        public IList<SeqHttpHeaderItem> AdditionalHeaders { get; } = new List<SeqHttpHeaderItem>();
+
+        /// <summary>
         /// Construct a <see cref="SeqTarget"/>.
         /// </summary>
         public SeqTarget()
         {
-            Properties = new List<SeqPropertyItem>();
             MaxRecursionLimit = 0;  // Default behavior for Serilog
             JsonPayloadMaxLength = 128 * 1024;
         }
@@ -148,7 +159,8 @@ namespace NLog.Targets.Seq
                 uri += SeqApi.BulkUploadResource;
                 _webRequestUri = new Uri(uri);
 
-                _headerApiKey = _apiKey?.Render(LogEventInfo.CreateNullEvent()) ?? string.Empty;
+                var nullEvent = LogEventInfo.CreateNullEvent();
+                var headerApiKey = _apiKey?.Render(nullEvent) ?? string.Empty;
 
                 HttpClientHandler handler = null;
 
@@ -168,6 +180,14 @@ namespace NLog.Targets.Seq
                 }
 
                 _httpClient = handler == null ? new HttpClient() : new HttpClient(handler);
+                
+                if (!string.IsNullOrWhiteSpace(headerApiKey))
+                    _httpClient.DefaultRequestHeaders.Add(SeqApi.ApiKeyHeaderName, headerApiKey);
+            
+                foreach (var additionalHeader in AdditionalHeaders)
+                {
+                    _httpClient.DefaultRequestHeaders.Add(additionalHeader.Name, additionalHeader.Value.Render(nullEvent));
+                }
             }
 
             base.InitializeTarget();
@@ -266,11 +286,9 @@ namespace NLog.Targets.Seq
             }
         }
 
-        private async Task SendPayload(StringBuilder payload)
+        async Task SendPayload(StringBuilder payload)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, _webRequestUri);
-            if (!string.IsNullOrWhiteSpace(_headerApiKey))
-                request.Headers.Add(SeqApi.ApiKeyHeaderName, _headerApiKey);
 
             var httpContent = new ByteArrayContent(EncodePayload(Utf8, payload));
             httpContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(SeqApi.CompactLogEventFormatMediaType) { CharSet = Utf8.WebName };
@@ -279,41 +297,37 @@ namespace NLog.Targets.Seq
             // Even if no events are above `_minimumLevel`, we'll send a batch to make sure we observe minimum
             // level changes sent by the server.
 
-            using (var response = await _httpClient.SendAsync(request).ConfigureAwait(false))
+            using var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+            if ((int)response.StatusCode > 299)
             {
-                if ((int)response.StatusCode > 299)
-                {
-                    var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
-                }
+                var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                throw new WebException($"Received failed response {response.StatusCode} from Seq server: {data}");
+            }
 
-                if ((int)response.StatusCode == (int)HttpStatusCode.Created)
+            if ((int)response.StatusCode == (int)HttpStatusCode.Created)
+            {
+                var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
+                if (serverRequestedLevel != _minimumLevel)
                 {
-                    var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    var serverRequestedLevel = LevelMapping.ToNLogLevel(SeqApi.ReadMinimumAcceptedLevel(data));
-                    if (serverRequestedLevel != _minimumLevel)
-                    {
-                        InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
-                        _minimumLevel = serverRequestedLevel;
-                    }
+                    InternalLogger.Info("Seq(Name={0}): Setting minimum log level to {1} per server request", Name, serverRequestedLevel);
+                    _minimumLevel = serverRequestedLevel;
                 }
             }
         }
 
-        private byte[] EncodePayload(Encoding encoder, StringBuilder payload)
+        byte[] EncodePayload(Encoding encoder, StringBuilder payload)
         {
             lock (_reusableEncodingBuffer)
             {
-                int totalLength = payload.Length;
+                var totalLength = payload.Length;
                 if (totalLength < _reusableEncodingBuffer.Length)
                 {
                     payload.CopyTo(0, _reusableEncodingBuffer, 0, payload.Length);
                     return encoder.GetBytes(_reusableEncodingBuffer, 0, totalLength);
                 }
-                else
-                {
-                    return encoder.GetBytes(payload.ToString());
-                }
+
+                return encoder.GetBytes(payload.ToString());
             }
         }
 
@@ -330,9 +344,9 @@ namespace NLog.Targets.Seq
             InitializeTarget();
         }
 
-        private static void AddJsonAttribute(JsonLayout jsonLayout, JsonAttribute jsonAttribute)
+        static void AddJsonAttribute(JsonLayout jsonLayout, JsonAttribute jsonAttribute)
         {
-            for (int i = jsonLayout.Attributes.Count - 1; i >= 0; --i)
+            for (var i = jsonLayout.Attributes.Count - 1; i >= 0; --i)
             {
                 if (jsonLayout.Attributes[i].Name == jsonAttribute.Name)
                 {
