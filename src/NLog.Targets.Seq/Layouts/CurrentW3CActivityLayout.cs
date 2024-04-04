@@ -1,4 +1,4 @@
-﻿// Seq Target for NLog - Copyright 2014-2017 Datalust and contributors
+// Seq Target for NLog - Copyright © Datalust and contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
+using System.Diagnostics;
 using System.Text;
-using NLog.Config;
 using NLog.Layouts;
 
-namespace NLog.Targets.Seq
+namespace NLog.Targets.Seq.Layouts
 {
-    [ThreadAgnostic]
-    class FormattedMessageLayout : Layout
+    /// <summary>
+    /// Formats elements of <see cref="Activity.Current"/> for inclusion in log events. Non-W3C-format activities are
+    /// ignored (Seq does not support the older Microsoft-proprietary hierarchical activity id format).
+    /// </summary>
+    class CurrentW3CActivityLayout: Layout
     {
+        readonly Func<Activity, string> _format;
+
+        public CurrentW3CActivityLayout(Func<Activity, string> format)
+        {
+            _format = format;
+        }
+        
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
             target.Append(GetFormattedMessage(logEvent));
@@ -28,26 +39,7 @@ namespace NLog.Targets.Seq
 
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
-            if (HasMessageTemplateSyntax(logEvent))
-            {
-                return string.Empty;    // Message Template Syntax, no need to include formatted message
-            }
-
-            return logEvent.FormattedMessage;
-        }
-
-        bool HasMessageTemplateSyntax(LogEventInfo logEvent)
-        {
-            if (!logEvent.HasProperties)
-                return false;
-
-            if (logEvent.Message?.IndexOf("{0", System.StringComparison.Ordinal) >= 0)
-            {
-                var mtp = logEvent.MessageTemplateParameters;
-                return !mtp.IsPositional;
-            }
-
-            return true;
-        }
+            return Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity ? _format(activity) : null;
+        }        
     }
 }
