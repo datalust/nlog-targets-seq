@@ -25,8 +25,6 @@ namespace Example
 
             // As are objects
             Logger.Info(new object());
-
-            Console.ReadKey();
         }
     }
 }

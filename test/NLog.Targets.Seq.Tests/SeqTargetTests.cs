@@ -3,15 +3,22 @@ using NLog.Config;
 using NLog.Targets.Seq.Tests.Support;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using Xunit;
+// ReSharper disable UseObjectOrCollectionInitializer
 
 namespace NLog.Targets.Seq.Tests
 {
     public class SeqTargetTests
     {
+        static SeqTargetTests()
+        {
+            Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+        }
+
         static void ToCompactJson(LogEventInfo evt, TextWriter output, IEnumerable<SeqPropertyItem> properties, int? maxRecursionLimit = null)
         {
             var target = new SeqTarget();
@@ -63,8 +70,8 @@ namespace NLog.Targets.Seq.Tests
         public void AMinimalEventIsValidJson()
         {
             var evt = AssertValidJson(log => log.Info("One {Property}", 42));
-            Assert.Equal(42, evt["Property"].Value<int>());
-            Assert.Equal("One {Property}", evt["@mt"].Value<string>());
+            Assert.Equal(42, evt["Property"]!.Value<int>());
+            Assert.Equal("One {Property}", evt["@mt"]!.Value<string>());
         }
 
         [Fact]
@@ -73,8 +80,8 @@ namespace NLog.Targets.Seq.Tests
             var logEvent = LogEventInfo.Create(LogLevel.Info, null, null, 42);
             logEvent.Properties["Property"] = 42;
             var evt = AssertValidJson(log => log.Log(logEvent));
-            Assert.Equal(42, evt["Property"].Value<int>());
-            Assert.Equal("42", evt["@m"].Value<string>());
+            Assert.Equal(42, evt["Property"]!.Value<int>());
+            Assert.Equal("42", evt["@m"]!.Value<string>());
         }
 
         [Fact]
@@ -83,8 +90,8 @@ namespace NLog.Targets.Seq.Tests
             var logEvent = new LogEventInfo { Message = "Hello " };
             logEvent.Properties["Answer"] = 42;
             var evt = AssertValidJson(log => log.Info(logEvent));
-            Assert.Equal(42, evt["Answer"].Value<int>());
-            Assert.Equal("Hello ", evt["@mt"].Value<string>());
+            Assert.Equal(42, evt["Answer"]!.Value<int>());
+            Assert.Equal("Hello ", evt["@mt"]!.Value<string>());
         }
 
         [Fact]
@@ -94,7 +101,7 @@ namespace NLog.Targets.Seq.Tests
             logEvent.Properties["Result"] = new { A = 1, B = 2, C = 3 };
             var result = logEvent.Properties["Result"].ToString();
             var evt = AssertValidJson(log => log.Info(logEvent));
-            Assert.Equal(result, evt["Result"].Value<string>());
+            Assert.Equal(result, evt["Result"]!.Value<string>());
         }
 
         [Fact]
@@ -103,7 +110,7 @@ namespace NLog.Targets.Seq.Tests
             var logEvent = new LogEventInfo { Message = "Hello " };
             logEvent.Properties["Result"] = new { A = 1, B = 2, C = 3 };
             var evt = AssertValidJson(log => log.Info(logEvent), maxRecursionLimit: 1);
-            Assert.Equal(3, evt["Result"].ToList().Count);
+            Assert.Equal(3, evt["Result"]!.ToList().Count);
         }
 
         [Fact]
@@ -187,6 +194,32 @@ namespace NLog.Targets.Seq.Tests
             dynamic evt = AssertValidJson(log => log.Info("Some {@StringData:000}", new StringData { Data = "A" }));
             Assert.Equal("A", (string)evt.StringData.Data);
             Assert.Single((JArray)evt["@r"]);
+        }
+
+        [Fact]
+        public void TraceAndSpanIdAreIgnoredWhenMissing()
+        {
+            Assert.Null(Activity.Current);
+            var evt = AssertValidJson(log => log.Info("Hello"));
+            Assert.False(evt.ContainsKey("@tr"));
+            Assert.False(evt.ContainsKey("@sp"));
+        }
+        
+        [Fact]
+        public void TraceAndSpanIdAreCollectedWhenPresent()
+        {
+            using var listener = new ActivityListener();
+            listener.ShouldListenTo = _ => true;
+            listener.Sample = delegate { return ActivitySamplingResult.AllData; };
+            ActivitySource.AddActivityListener(listener);
+
+            var source = new ActivitySource("Example");
+            using var activity = source.StartActivity()!;
+
+            dynamic evt = AssertValidJson(log => log.Info("Hello"));
+
+            Assert.Equal(activity.TraceId.ToHexString(), (string)evt["@tr"]);
+            Assert.Equal(activity.SpanId.ToHexString(), (string)evt["@sp"]);
         }
     }
 }
