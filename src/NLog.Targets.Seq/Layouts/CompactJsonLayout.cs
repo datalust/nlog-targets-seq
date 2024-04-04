@@ -27,8 +27,8 @@ namespace NLog.Targets.Seq.Layouts
             _exceptionAttribute = new("@x", new SimpleLayout("${exception:format=toString}")),
             _messageAttribute = new("@m", new FormattedMessageLayout()),
             _messageTemplateAttribute = new("@mt", new SimpleLayout("${onhasproperties:${message:raw=true}}")),
-            _traceIdAttribute = new("@tr", new TraceIdLayout()),
-            _spanIdAttribute = new("@sp", new SpanIdLayout());
+            _traceIdAttribute = new("@tr", new CurrentW3CActivityLayout(a => a.TraceId.ToHexString())),
+            _spanIdAttribute = new("@sp", new CurrentW3CActivityLayout(a => a.SpanId.ToHexString()));
 
         public Layout LogLevel { get => _levelAttribute.Layout; set => _levelAttribute.Layout = value; }
 
