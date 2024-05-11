@@ -204,17 +204,23 @@ namespace NLog.Targets.Seq.Tests
             Assert.False(evt.ContainsKey("@tr"));
             Assert.False(evt.ContainsKey("@sp"));
         }
-        
+
+        [Fact]
+        public void TraceAndSpanIdAreIgnoredWhenEmpty()
+        {
+            using var activity = new Activity("child").SetParentId(default, default).Start();    // TraceId comes from the Parent-Activity
+            Assert.NotNull(Activity.Current);
+
+            var evt = AssertValidJson(log => log.Info("Hello"));
+            Assert.False(evt.ContainsKey("@tr"));
+            Assert.Equal(activity.SpanId.ToHexString(), (string)evt["@sp"]);
+        }
+
         [Fact]
         public void TraceAndSpanIdAreCollectedWhenPresent()
         {
-            using var listener = new ActivityListener();
-            listener.ShouldListenTo = _ => true;
-            listener.Sample = delegate { return ActivitySamplingResult.AllData; };
-            ActivitySource.AddActivityListener(listener);
-
-            var source = new ActivitySource("Example");
-            using var activity = source.StartActivity()!;
+            using var activity = new Activity("Example").Start();
+            Assert.NotNull(Activity.Current);
 
             dynamic evt = AssertValidJson(log => log.Info("Hello"));
 
