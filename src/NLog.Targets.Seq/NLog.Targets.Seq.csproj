@@ -4,7 +4,7 @@
     <Description>An NLog target that writes structured log events to Seq</Description>
     <Authors>Datalust;Contributors</Authors>
     <VersionPrefix>4.0.2</VersionPrefix>
-    <TargetFrameworks>net462;netstandard2.0;net6.0</TargetFrameworks>
+    <TargetFrameworks>net462;netstandard2.0;net6.0;net8.0</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyOriginatorKeyFile>../../asset/nlog-targets-seq.snk</AssemblyOriginatorKeyFile>
