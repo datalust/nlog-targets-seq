@@ -42,19 +42,13 @@ namespace NLog.Targets.Seq
         private static string SpanIdToHexString(ActivitySpanId spanId)
         {
             var spanIdString = spanId.ToHexString();
-            if (ReferenceEquals(EmptySpanIdToHexString, spanIdString))
-                return string.Empty;
-            else
-                return spanIdString;
+            return EmptySpanIdToHexString.Equals(spanIdString, System.StringComparison.Ordinal) ? string.Empty : spanIdString;
         }
 
         private static string TraceIdToHexString(ActivityTraceId traceId)
         {
             var traceIdString = traceId.ToHexString();
-            if (ReferenceEquals(EmptyTraceIdToHexString, traceIdString))
-                return string.Empty;
-            else
-                return traceIdString;
+            return EmptyTraceIdToHexString.Equals(traceIdString, System.StringComparison.Ordinal) ? string.Empty : traceIdString;
         }
     }
 }
