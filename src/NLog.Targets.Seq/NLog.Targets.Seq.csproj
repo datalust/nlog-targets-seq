@@ -3,8 +3,8 @@
   <PropertyGroup>
     <Description>An NLog target that writes structured log events to Seq</Description>
     <Authors>Datalust;Contributors</Authors>
-    <VersionPrefix>4.0.1</VersionPrefix>
-    <TargetFrameworks>net462;netstandard2.0;net6.0</TargetFrameworks>
+    <VersionPrefix>4.0.2</VersionPrefix>
+    <TargetFrameworks>net462;netstandard2.0;net6.0;net8.0</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyOriginatorKeyFile>../../asset/nlog-targets-seq.snk</AssemblyOriginatorKeyFile>
@@ -33,10 +33,12 @@
   <ItemGroup>
     <PackageReference Include="NLog" Version="5.2.5" />
   </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net462' ">
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+  </ItemGroup>
   
   <ItemGroup Condition=" '$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
-    <PackageReference Include="System.Net.Http" Version="4.3.4" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.0" />
   </ItemGroup>
 

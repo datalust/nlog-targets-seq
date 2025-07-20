@@ -22,8 +22,8 @@ namespace NLog.Targets.Seq
     /// </summary>
     internal static class ActivityExtensions
     {
-        private static readonly System.Diagnostics.ActivitySpanId EmptySpanId = default(System.Diagnostics.ActivitySpanId);
-        private static readonly System.Diagnostics.ActivityTraceId EmptyTraceId = default(System.Diagnostics.ActivityTraceId);
+        private static readonly string EmptySpanIdToHexString = default(System.Diagnostics.ActivitySpanId).ToHexString();
+        private static readonly string EmptyTraceIdToHexString = default(System.Diagnostics.ActivityTraceId).ToHexString();
 
         public static string GetSpanId(this Activity activity)
         {
@@ -41,26 +41,14 @@ namespace NLog.Targets.Seq
 
         private static string SpanIdToHexString(ActivitySpanId spanId)
         {
-            if (EmptySpanId.Equals(spanId))
-                return string.Empty;
-
-            var spanHexString = spanId.ToHexString();
-            if (ReferenceEquals(spanHexString, EmptySpanId.ToHexString()))
-                return string.Empty;
-
-            return spanHexString;
+            var spanIdString = spanId.ToHexString();
+            return EmptySpanIdToHexString.Equals(spanIdString, System.StringComparison.Ordinal) ? string.Empty : spanIdString;
         }
 
         private static string TraceIdToHexString(ActivityTraceId traceId)
         {
-            if (EmptyTraceId.Equals(traceId))
-                return string.Empty;
-
-            var traceHexString = traceId.ToHexString();
-            if (ReferenceEquals(traceHexString, EmptyTraceId.ToHexString()))
-                return string.Empty;
-
-            return traceHexString;
+            var traceIdString = traceId.ToHexString();
+            return EmptyTraceIdToHexString.Equals(traceIdString, System.StringComparison.Ordinal) ? string.Empty : traceIdString;
         }
     }
 }
